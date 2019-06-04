@@ -1,0 +1,282 @@
+#pragma once
+
+#include <cv.h>
+#include <opencv2/core/core.hpp>
+#include <opencv2\highgui\highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/features2d/features2d.hpp>
+
+#include <vector>
+#include <fstream>
+
+/**************************************************
+Declaration
+**************************************************/
+void readAnnotatedPoints(
+	const std::string& path_,
+	cv::Mat& points_,
+	std::vector<int>& labels_);
+
+void loadMatrix(
+	const std::string& path_,
+	cv::Mat& matrix_);
+
+template<typename T>
+void drawMatches(
+	const cv::Mat& points_,
+	const std::vector<int>& labeling_,
+	const cv::Mat& image1_,
+	const cv::Mat& image2_,
+	cv::Mat& out_image_);
+
+bool savePointsToFile(
+	const std::string& path_,
+	std::vector<cv::Point2d>& src_points_, 
+	std::vector<cv::Point2d>& dst_points_);
+
+bool loadPointsFromFile(
+	const std::string& path_,
+	std::vector<cv::Point2d>& src_points_, 
+	std::vector<cv::Point2d>& dst_points_);
+
+bool loadProjectionMatrix(
+	cv::Mat& P, 
+	std::string file);
+
+void showImage(const cv::Mat& image_,
+	std::string window_name_,
+	int max_width_ = std::numeric_limits<int>::max(),
+	int max_height_ = std::numeric_limits<int>::max());
+
+template <typename Model, typename Estimator>
+void refineManualLabeling(
+	const cv::Mat& points_,
+	std::vector<int>& labeling_,
+	const Estimator estimator_,
+	const double threshold_);
+
+/**************************************************
+Implementation
+**************************************************/
+template <typename Model, typename Estimator>
+void refineManualLabeling(
+	const cv::Mat& points_,
+	std::vector<int>& labeling_,
+	const Estimator estimator_,
+	const double threshold_)
+{
+	// Collect the points labeled as inliers
+	std::vector<int> inliers;
+	const size_t N = labeling_.size();
+	inliers.reserve(N);
+	for (auto i = 0; i < N; ++i)
+		if (labeling_[i])
+			inliers.push_back(i);
+
+	// Estimate a model from the manually selected inliers
+	std::vector<Model> models;
+	estimator_.estimateModelNonminimal(points_,
+		&(inliers[0]),
+		inliers.size(),
+		&models);
+
+	if (models.size() != 1)
+	{
+		fprintf(stderr, "A problem occured when refining the manual annotation.\n");
+		return;
+	}
+
+	// Select the inliers of the estimated model
+	for (auto i = 0; i < N; ++i)
+		labeling_[i] = estimator_.error(points_.row(i), models[0]) < threshold_;
+}
+
+void loadMatrix(
+	const std::string& path_,
+	cv::Mat& matrix_)
+{
+	std::ifstream file(path_);
+
+	for (int r = 0; r < matrix_.rows; ++r)
+		for (int c = 0; c < matrix_.cols; ++c)
+			file >> matrix_.at<double>(r, c);
+	file.close();
+}
+
+bool loadPointsFromFile(
+	const std::string& path_,
+	std::vector<cv::Point2d>& src_points_, 
+	std::vector<cv::Point2d>& dst_points_)
+{
+	std::ifstream infile(path_);
+
+	if (!infile.is_open())
+		return false;
+
+	double x1, y1, x2, y2;
+
+	std::string line;
+	while (getline(infile, line))
+	{
+		std::istringstream split(line);
+		split >> x1 >> y1 >> x2 >> y2;
+
+		src_points_.push_back(cv::Point2d(x1, y1));
+		dst_points_.push_back(cv::Point2d(x2, y2));
+	}
+
+	infile.close();
+	return true;
+}
+
+bool loadProjectionMatrix(
+	const std::string& path_,
+	cv::Mat& matrix_)
+{
+	std::ifstream infile(path_);
+
+	if (!infile.is_open())
+		return false;
+
+	double* P_ptr = (double*)matrix_.data;
+	while (infile >> *(P_ptr++));
+	infile.close();
+	return true;
+}
+
+bool savePointsToFile(
+	const std::string& path_,
+	std::vector<cv::Point2d>& src_points_, 
+	std::vector<cv::Point2d>& dst_points_)
+{
+	std::ofstream outfile(path_);
+
+	for (auto i = 0; i < src_points_.size(); ++i)
+	{
+		outfile << src_points_[i].x << " " << src_points_[i].y << " ";
+		outfile << dst_points_[i].x << " " << dst_points_[i].y << " ";
+		outfile << std::endl;
+	}
+
+	outfile.close();
+
+	return true;
+}
+
+void readAnnotatedPoints(
+	const std::string& path_,
+	cv::Mat& points_, 
+	std::vector<int>& labels_)
+{
+	std::ifstream file(path_);
+
+	double x1, y1, x2, y2, a, s;
+	std::string str;
+
+	std::vector<cv::Point2d> pts1;
+	std::vector<cv::Point2d> pts2;
+	if (path_.find("extremeview") != std::string::npos) // For extremeview dataset
+	{
+		while (file >> x1 >> y1 >> x2 >> y2 >> s >> s >> str >> str >> a)
+		{
+			pts1.push_back(cv::Point2d(x1, y1));
+			pts2.push_back(cv::Point2d(x2, y2));
+			labels_.push_back(a > 0 ? 1 : 0);
+		}
+	}
+	else
+	{
+		while (file >> x1 >> y1 >> s >> x2 >> y2 >> s >> a)
+		{
+			pts1.push_back(cv::Point2d(x1, y1));
+			pts2.push_back(cv::Point2d(x2, y2));
+			labels_.push_back(a > 0 ? 1 : 0);
+		}
+	}
+
+	file.close();
+
+	points_.create(static_cast<int>(pts1.size()), 6, CV_64F);
+	for (int i = 0; i < pts1.size(); ++i)
+	{
+		points_.at<double>(i, 0) = pts1[i].x;
+		points_.at<double>(i, 1) = pts1[i].y;
+		points_.at<double>(i, 2) = 1;
+		points_.at<double>(i, 3) = pts2[i].x;
+		points_.at<double>(i, 4) = pts2[i].y;
+		points_.at<double>(i, 5) = 1;
+	}
+}
+
+template<typename T>
+void drawMatches(
+	const cv::Mat &points_, 
+	const std::vector<int>& labeling_,
+	const cv::Mat& image1_,
+	const cv::Mat& image2_,
+	cv::Mat& out_image_)
+{
+	const size_t N = points_.rows;
+	std::vector< cv::KeyPoint > keypoints1, keypoints2;
+	std::vector< cv::DMatch > matches;
+
+	keypoints1.reserve(N);
+	keypoints2.reserve(N);
+	matches.reserve(N);
+
+	// Collect the points which has label 1 (i.e. inlier)
+	for (auto pt_idx = 0; pt_idx < N; ++pt_idx)
+	{
+		if (!labeling_[pt_idx])
+			continue;
+
+		const T x1 = points_.at<T>(pt_idx, 0);
+		const T y1 = points_.at<T>(pt_idx, 1);
+		const T x2 = points_.at<T>(pt_idx, 3);
+		const T y2 = points_.at<T>(pt_idx, 4);
+		const size_t n = keypoints1.size();
+
+		keypoints1.emplace_back(
+			cv::KeyPoint(cv::Point_<T>(x1, y1), 0));
+		keypoints2.emplace_back(
+			cv::KeyPoint(cv::Point_<T>(x2, y2), 0));
+		matches.emplace_back(cv::DMatch(static_cast<int>(n), static_cast<int>(n), 0));
+	}
+
+	// Draw the matches using OpenCV's built-in function
+	cv::drawMatches(image1_,
+		keypoints1,
+		image2_,
+		keypoints2,
+		matches,
+		out_image_);
+}
+
+void showImage(const cv::Mat &image_,
+	std::string window_name_,
+	int max_width_,
+	int max_height_)
+{
+	// Resizing the window to fit into the screen if needed
+	int window_width = image_.cols,
+		window_height = image_.rows;
+	if (static_cast<double>(image_.cols) / max_width_ > 1.0 &&
+		static_cast<double>(image_.cols) / max_width_ >
+		static_cast<double>(image_.rows) / max_height_)
+	{
+		window_width = max_width_;
+		window_height = static_cast<int>(window_width * static_cast<double>(image_.rows) / static_cast<double>(image_.cols));
+	}
+	else if (static_cast<double>(image_.rows) / max_height_ > 1.0 &&
+		static_cast<double>(image_.cols) / max_width_ <
+		static_cast<double>(image_.rows) / max_height_)
+	{
+		window_height = max_height_;
+		window_width = static_cast<int>(window_height * static_cast<double>(image_.cols) / static_cast<double>(image_.rows));
+	}
+
+	cv::namedWindow(window_name_, CV_WINDOW_NORMAL);
+	cv::resizeWindow(window_name_, window_width, window_height);
+	cv::imshow(window_name_, image_);
+	cv::waitKey(0);
+}

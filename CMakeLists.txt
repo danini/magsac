@@ -15,7 +15,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # ==============================================================================
 # Find OpenCV
 # ==============================================================================
-find_package(OpenCV 3.46 REQUIRED)
+find_package(OpenCV 3.3 REQUIRED)
 
 # ==============================================================================
 # Find OpenMP
@@ -33,7 +33,7 @@ endif (USE_OPENMP)
 # Includes
 # ==============================================================================
 include_directories (
-	${PROJECT_SOURCE_DIR}/include/magsac
+	${PROJECT_SOURCE_DIR}/include
 )
 
 # ==============================================================================
@@ -43,16 +43,16 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
 # Set header files for the library
 file(GLOB_RECURSE HDRS_MAGSAC
-	"include/magsac/*.h"
-	"include/magsac/*.cpp"
+	"include/*.h"
+	"include/*.cpp"
 ) 
 
 # Set source files to be added to the library
 file(GLOB_RECURSE SRCS_MAGSAC 
-	"src/magsac/*.cpp"
+	"src/*.cpp"
 )
 
-add_library(${PROJECT_NAME} STATIC
+add_executable(${PROJECT_NAME}
 	${HDRS_MAGSAC}
 	${SRCS_MAGSAC}
 )
