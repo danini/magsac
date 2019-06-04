@@ -60,10 +60,10 @@ Implementation
 **************************************************/
 template <typename Model, typename Estimator>
 void refineManualLabeling(
-	const cv::Mat& points_,
-	std::vector<int>& labeling_,
-	const Estimator estimator_,
-	const double threshold_)
+	const cv::Mat& points_, // All data points
+	std::vector<int>& labeling_, // The labeling to be refined
+	const Estimator estimator_, // The estimator object which has an error(...) function to calculate the residual of each point
+	const double threshold_) // The inlier-outlier threshold
 {
 	// Collect the points labeled as inliers
 	std::vector<int> inliers;
@@ -71,7 +71,7 @@ void refineManualLabeling(
 	inliers.reserve(N);
 	for (auto i = 0; i < N; ++i)
 		if (labeling_[i])
-			inliers.push_back(i);
+			inliers.emplace_back(i);
 
 	// Estimate a model from the manually selected inliers
 	std::vector<Model> models;
@@ -89,6 +89,17 @@ void refineManualLabeling(
 	// Select the inliers of the estimated model
 	for (auto i = 0; i < N; ++i)
 		labeling_[i] = estimator_.error(points_.row(i), models[0]) < threshold_;
+}
+
+template <typename LabelType>
+std::vector<LabelType> getSubsetFromLabeling(const std::vector<LabelType>& labeling_,
+	const LabelType label_)
+{
+	std::vector<LabelType> results;
+	for (auto idx = 0; idx < labeling_.size(); ++idx)
+		if (labeling_[idx] == label_)
+			results.emplace_back(idx);
+	return results;
 }
 
 void loadMatrix(
@@ -121,8 +132,8 @@ bool loadPointsFromFile(
 		std::istringstream split(line);
 		split >> x1 >> y1 >> x2 >> y2;
 
-		src_points_.push_back(cv::Point2d(x1, y1));
-		dst_points_.push_back(cv::Point2d(x2, y2));
+		src_points_.emplace_back(cv::Point2d(x1, y1));
+		dst_points_.emplace_back(cv::Point2d(x2, y2));
 	}
 
 	infile.close();
@@ -179,18 +190,18 @@ void readAnnotatedPoints(
 	{
 		while (file >> x1 >> y1 >> x2 >> y2 >> s >> s >> str >> str >> a)
 		{
-			pts1.push_back(cv::Point2d(x1, y1));
-			pts2.push_back(cv::Point2d(x2, y2));
-			labels_.push_back(a > 0 ? 1 : 0);
+			pts1.emplace_back(cv::Point2d(x1, y1));
+			pts2.emplace_back(cv::Point2d(x2, y2));
+			labels_.emplace_back(a > 0 ? 1 : 0);
 		}
 	}
 	else
 	{
 		while (file >> x1 >> y1 >> s >> x2 >> y2 >> s >> a)
 		{
-			pts1.push_back(cv::Point2d(x1, y1));
-			pts2.push_back(cv::Point2d(x2, y2));
-			labels_.push_back(a > 0 ? 1 : 0);
+			pts1.emplace_back(cv::Point2d(x1, y1));
+			pts2.emplace_back(cv::Point2d(x2, y2));
+			labels_.emplace_back(a > 0 ? 1 : 0);
 		}
 	}
 

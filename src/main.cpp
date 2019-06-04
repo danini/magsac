@@ -1,8 +1,4 @@
-// VisionFrameWork.cpp : Defines the entry point for the console application.
-//
-
-#include "stdafx.h"
-
+#include <string.h>
 #include <fstream>
 #include <vector>
 #include <ppl.h>
@@ -41,9 +37,6 @@ void testHomographyFitting(
 std::vector<std::string> getAvailableTestScenes(
 	SceneType scene_type_);
 
-double tmp_error;
-int partition_number = 5;
-
 int main(int argc, const char* argv[])
 {
 	/*
@@ -58,39 +51,18 @@ int main(int argc, const char* argv[])
 
 	const double ransac_confidence = 0.99; // The required confidence in the results
 	const double sigma_max = 10; // The maximum sigma value allowed in MAGSAC
-	const bool draw_results = false; // A flag to draw and show the results 
+	const bool draw_results = true; // A flag to draw and show the results 
 	// The inlier threshold for visualization. This threshold is not used by the algorithm,
 	// it is simply for selecting the inliers to be drawn after MAGSAC finished.
-	const double drawing_threshold = 2.0;
-	int reps = 10;
-	std::ofstream file("tuning_homography.csv");
-	for (partition_number = 5; partition_number < 100; partition_number += 5)
-	{
-		for (double sigma_max = 1; sigma_max < 100; sigma_max += 1)
-		{
-			double avg_error = 0, best_avg_error = DBL_MAX;
-			for (auto r = 0; r < reps; ++r)
-			{
-				for (const auto& scene : getAvailableTestScenes(SceneType::HomographyScene))
-				{
-					// Test scenes for homography estimation
-					for (const auto& scene : getAvailableTestScenes(SceneType::HomographyScene))
-						testHomographyFitting(ransac_confidence,
-							sigma_max, // The maximum sigma value allowed in MAGSAC
-							scene, // The scene type
-							draw_results, // A flag to draw and show the results 
-							drawing_threshold); // The inlier threshold for visualization.
+	const double drawing_threshold = 1.0;
 
-					avg_error += tmp_error;
-				}
-			}
-			avg_error /= reps * getAvailableTestScenes(SceneType::HomographyScene).size();
-
-			file << sigma_max << ";" << partition_number << ";" << avg_error << std::endl;
-			printf("Sigma max = %f -> RMSE = %f\n", sigma_max, avg_error);
-		}
-	}
-	file.close();
+	// Test scenes for homography estimation
+	for (const auto& scene : getAvailableTestScenes(SceneType::HomographyScene))
+		testHomographyFitting(ransac_confidence,
+			sigma_max, // The maximum sigma value allowed in MAGSAC
+			scene, // The scene type
+			draw_results, // A flag to draw and show the results 
+			drawing_threshold); // The inlier threshold for visualization.
 
 	// Test scenes for fundamental matrix estimation
 	for (const auto& scene : getAvailableTestScenes(SceneType::FundamentalMatrixScene))
@@ -145,12 +117,12 @@ void testFundamentalMatrixFitting(
 	printf("Processed scene = '%s'.\n", test_scene_.c_str());
 
 	// Load the images of the current test scene
-	cv::Mat image1 = imread("data/fundamental_matrix/" + test_scene_ + "A.png");
-	cv::Mat image2 = imread("data/fundamental_matrix/" + test_scene_ + "B.png");
+	cv::Mat image1 = cv::imread("data/fundamental_matrix/" + test_scene_ + "A.png");
+	cv::Mat image2 = cv::imread("data/fundamental_matrix/" + test_scene_ + "B.png");
 	if (image1.cols == 0)
 	{
-		image1 = imread("data/fundamental_matrix/" + test_scene_ + "A.jpg");
-		image2 = imread("data/fundamental_matrix/" + test_scene_ + "B.jpg");
+		image1 = cv::imread("data/fundamental_matrix/" + test_scene_ + "A.jpg");
+		image2 = cv::imread("data/fundamental_matrix/" + test_scene_ + "B.jpg");
 	}
 
 	if (image1.cols == 0)
@@ -179,15 +151,26 @@ void testFundamentalMatrixFitting(
 	FundamentalMatrixEstimator estimator; // The robust homography estimator class containing the function for the fitting and residual calculation
 	FundamentalMatrix model; // The estimated model
 
+	// In this used datasets, the manually selected inliers are not all inliers but a subset of them.
+	// Therefore, the manually selected inliers are augmented as follows: 
+	// (i) First, the implied model is estimated from the manually selected inliers.
+	// (ii) Second, the inliers of the ground truth model are selected.
 	refineManualLabeling<FundamentalMatrix, FundamentalMatrixEstimator>(
 		points,
 		ground_truth_labels,
 		estimator,
-		1.0);
-	 
+		0.35); // Threshold value from the LO*-RANSAC paper
+
+	// Select the inliers from the labeling
+	std::vector<int> ground_truth_inliers = getSubsetFromLabeling(ground_truth_labels, 1);
+	const size_t I = static_cast<double>(ground_truth_inliers.size());
+
 	printf("Estimated model = '%s'.\n", estimator.modelName().c_str());
 	printf("Number of correspondences loaded = %d.\n", static_cast<int>(N));
-
+	printf("Number of ground truth inliers = %d.\n", static_cast<int>(I));
+	printf("Theoretical RANSAC iteration number at %.2f confidence = %d.\n",
+		ransac_confidence_, static_cast<int>(log(1.0 - ransac_confidence_) / log(1.0 - pow(static_cast<double>(I) / static_cast<double>(N), 4))));
+	
 	MAGSAC<FundamentalMatrixEstimator, FundamentalMatrix> magsac;
 	magsac.setSigmaMax(sigma_max_); // The maximum noise scale sigma allowed
 	magsac.setCoreNumber(4); // The number of cores used to speed up sigma-consensus
@@ -207,22 +190,19 @@ void testFundamentalMatrixFitting(
 	std::chrono::duration<double> elapsed_seconds = end - start;
 	std::time_t end_time = std::chrono::system_clock::to_time_t(end);
 
+	printf("Actual number of iterations drawn by MAGSAC at %.2f confidence: %d\n", ransac_confidence_, iteration_number);
 	printf("Elapsed time: %f secs\n", elapsed_seconds.count());
-	printf("Number of iterations: %d\n", iteration_number);
 
 	// Compute the RMSE given the ground truth inliers
 	double rmse = 0, error;
 	size_t inlier_number = 0;
-	for (auto i = 0; i < ground_truth_labels.size(); ++i)
+	for (const auto &inlier_idx : ground_truth_inliers)
 	{
-		if (ground_truth_labels[i])
-		{
-			error = estimator.error(points.row(i), model);
-			rmse += error * error;
-			++inlier_number;
-		}
-	} 
-	rmse = sqrt(rmse / inlier_number);
+		error = estimator.error(points.row(inlier_idx), model);
+		rmse += error * error;
+		++inlier_number;
+	}
+	rmse = sqrt(rmse / static_cast<double>(I));
 	printf("RMSE error: %f px\n", rmse);
 
 	// Visualization part.
@@ -237,7 +217,7 @@ void testFundamentalMatrixFitting(
 			// Computing the residual of the point given the estimated model
 			auto residual = estimator.error(points.row(pt_idx),
 				model.descriptor);
-
+			
 			// Change the label to 'inlier' if the residual is smaller than the threshold
 			if (drawing_threshold_ >= residual)
 				obtained_labeling[pt_idx] = 1;
@@ -272,12 +252,12 @@ void testHomographyFitting(
 	printf("Processed scene = '%s'.\n", test_scene_.c_str());
 
 	// Load the images of the current test scene
-	cv::Mat image1 = imread("data/homography/" + test_scene_ + "A.png");
-	cv::Mat image2 = imread("data/homography/" + test_scene_ + "B.png");
+	cv::Mat image1 = cv::imread("data/homography/" + test_scene_ + "A.png");
+	cv::Mat image2 = cv::imread("data/homography/" + test_scene_ + "B.png");
 	if (image1.cols == 0)
 	{
-		image1 = imread("data/homography/" + test_scene_ + "A.jpg");
-		image2 = imread("data/homography/" + test_scene_ + "B.jpg");
+		image1 = cv::imread("data/homography/" + test_scene_ + "A.jpg");
+		image2 = cv::imread("data/homography/" + test_scene_ + "B.jpg");
 	}
 
 	if (image1.cols == 0)
@@ -294,7 +274,6 @@ void testHomographyFitting(
 		points, 
 		ground_truth_labels);
 
-
 	// The number of points in the datasets
 	const size_t N = points.rows; // The number of points in the scene
 
@@ -307,19 +286,30 @@ void testHomographyFitting(
 	RobustHomographyEstimator estimator; // The robust homography estimator class containing the function for the fitting and residual calculation
 	Homography model; // The estimated model
 
+	// In this used datasets, the manually selected inliers are not all inliers but a subset of them.
+	// Therefore, the manually selected inliers are augmented as follows: 
+	// (i) First, the implied model is estimated from the manually selected inliers.
+	// (ii) Second, the inliers of the ground truth model are selected.
 	refineManualLabeling<Homography, RobustHomographyEstimator>(
 		points,
 		ground_truth_labels,
 		estimator,
-		1.0);
+		2.0);
+
+	// Select the inliers from the labeling
+	std::vector<int> ground_truth_inliers = getSubsetFromLabeling(ground_truth_labels, 1);
+	const size_t I = static_cast<double>(ground_truth_inliers.size());
 
 	printf("Estimated model = '%s'.\n", estimator.modelName().c_str());
 	printf("Number of correspondences loaded = %d.\n", static_cast<int>(N));
+	printf("Number of ground truth inliers = %d.\n", static_cast<int>(I));
+	printf("Theoretical RANSAC iteration number at %.2f confidence = %d.\n", 
+		ransac_confidence_, static_cast<int>(log(1.0 - ransac_confidence_) / log(1.0 - pow(static_cast<double>(I) / static_cast<double>(N), 4))));
 
 	MAGSAC<RobustHomographyEstimator, Homography> magsac;
 	magsac.setSigmaMax(sigma_max_); // The maximum noise scale sigma allowed
 	magsac.setCoreNumber(4); // The number of cores used to speed up sigma-consensus
-	magsac.setPartitionNumber(partition_number); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
+	magsac.setPartitionNumber(10); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
 
 	int iteration_number = 0; // Number of iterations required
 
@@ -335,23 +325,18 @@ void testHomographyFitting(
 	std::chrono::duration<double> elapsed_seconds = end - start;
 	std::time_t end_time = std::chrono::system_clock::to_time_t(end);
 
+	printf("Actual number of iterations drawn by MAGSAC at %.2f confidence: %d\n", ransac_confidence_, iteration_number);
 	printf("Elapsed time: %f secs\n", elapsed_seconds.count());
-	printf("Number of iterations: %d\n", iteration_number);
 	 
 	// Compute the RMSE given the ground truth inliers
 	double rmse = 0, error;
 	size_t inlier_number = 0;
-	for (auto i = 0; i < ground_truth_labels.size(); ++i)
+	for (const auto& inlier_idx : ground_truth_inliers)
 	{
-		if (ground_truth_labels[i])
-		{
-			error = estimator.error(points.row(i), model);
-			rmse += error * error;
-			++inlier_number;
-		}
+		error = estimator.error(points.row(inlier_idx), model);
+		rmse += error;
 	}
-	rmse = sqrt(rmse / inlier_number);
-	tmp_error = rmse;
+	rmse = sqrt(rmse / static_cast<double>(I));
 	printf("RMSE error: %f px\n", rmse);
 
 	// Visualization part.
@@ -364,8 +349,8 @@ void testHomographyFitting(
 		for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx)
 		{
 			// Computing the residual of the point given the estimated model
-			auto residual = estimator.error(points.row(pt_idx),
-				model.descriptor);
+			auto residual = sqrt(estimator.error(points.row(pt_idx),
+				model.descriptor));
 			
 			// Change the label to 'inlier' if the residual is smaller than the threshold
 			if (drawing_threshold_ >= residual)
@@ -378,7 +363,7 @@ void testHomographyFitting(
 
 		// Show the matches
 		std::string window_name = "Visualization with threshold = " + std::to_string(drawing_threshold_) + " px";
-		printf("Press a button to continue.\n");
+		printf("Press a button to continue.\n\n");
 		showImage(out_image,
 			window_name,
 			1600,
