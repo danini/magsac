@@ -225,15 +225,6 @@ void MAGSAC<ModelEstimator, Model>::run(
 			refined_model,
 			so_far_the_best_score,
 			estimator_);
-
-		// Calculate the score of the model and the implied iteration number
-		double marginalized_iteration_number;
-		getSigmaScore(points_, // All the input points
-			refined_model, // The estimated model
-			estimator_, // The estimator
-			marginalized_iteration_number, // The marginalized inlier ratio
-			so_far_the_best_score.J); // The marginalized score
-
 		so_far_the_best_model = refined_model;
 	}
 

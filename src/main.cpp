@@ -195,12 +195,10 @@ void testFundamentalMatrixFitting(
 
 	// Compute the RMSE given the ground truth inliers
 	double rmse = 0, error;
-	size_t inlier_number = 0;
 	for (const auto &inlier_idx : ground_truth_inliers)
 	{
 		error = estimator.error(points.row(inlier_idx), model);
 		rmse += error * error;
-		++inlier_number;
 	}
 	rmse = sqrt(rmse / static_cast<double>(I));
 	printf("RMSE error: %f px\n", rmse);
