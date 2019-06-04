@@ -1,6 +1,6 @@
-# Graph-Cut RANSAC
+# MAGSAC algorithm for robust model fitting without inlier-outlier threshold
 
-The Graph-Cut RANSAC algorithm proposed in paper: Daniel Barath and Jiri Matas; Graph-Cut RANSAC, Conference on Computer Vision and Pattern Recognition, 2018. 
-It is available at http://openaccess.thecvf.com/content_cvpr_2018/papers/Barath_Graph-Cut_RANSAC_CVPR_2018_paper.pdf
+The MAGASC algorithm proposed in paper: Daniel Barath, Jana Noskova and Jiri Matas; MAGSAC: Marginalizing sample consensus, Conference on Computer Vision and Pattern Recognition, 2019. 
+It is available at https://arxiv.org/pdf/1803.07469.pdf
 
-Made in OpenCV 3.31.
+Made in OpenCV 3.46.
