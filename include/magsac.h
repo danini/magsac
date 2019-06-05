@@ -135,7 +135,7 @@ void MAGSAC<ModelEstimator, Model>::run(
 	log_confidence = log(1.0 - confidence_); // The logarithm of 1 - confidence
 	point_number = points_.rows; // Number of points
 	const int sample_size = estimator_.sampleSize(); // The sample size required for the estimation
-	int max_iteration = iteration_limit; // The maximum number of iterations initialized to the iteration limit
+	size_t max_iteration = iteration_limit; // The maximum number of iterations initialized to the iteration limit
 	int iteration = 0; // Current number of iterations
 	Model so_far_the_best_model; // Current best model
 	ModelScore so_far_the_best_score; // The score of the current best model
