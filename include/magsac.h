@@ -2,7 +2,13 @@
 
 #include <limits>
 #include <cv.h>
+#include <chrono>
+#include <memory>
 #include "model_score.h"
+
+#ifdef _WIN32 
+	#include <ppl.h>
+#endif
 
 template <class ModelEstimator, class Model>
 class MAGSAC  
@@ -261,7 +267,12 @@ void MAGSAC<ModelEstimator, Model>::postProcessing(
 
 	// Sort the (residual, point index) pairs in ascending order
 	const auto comparator = [](std::pair<double, int> left, std::pair<double, int> right) { return left.first < right.first; };
+
+#ifdef _WIN32 
 	concurrency::parallel_sort(all_residuals.begin(), all_residuals.end(), comparator);
+#else
+	std::sort(all_residuals.begin(), all_residuals.end(), comparator);
+#endif
 
 	// Set the threshold to be the distance of the farthest point which has lower residual than the maximum sigma
 	threshold = all_residuals.back().first + 
@@ -436,7 +447,11 @@ void MAGSAC<ModelEstimator, Model>::sigmaConsensus(
 	const int Ni = all_residuals.size();
 
 	// Sorting the distances
+#ifdef _WIN32 
 	concurrency::parallel_sort(all_residuals.begin(), all_residuals.end(), cmp);
+#else
+	std::sort(all_residuals.begin(), all_residuals.end(), cmp);
+#endif
 	threshold = all_residuals.back().first + FLT_EPSILON;
 
 	int sigma_idx;
@@ -460,7 +475,11 @@ void MAGSAC<ModelEstimator, Model>::sigmaConsensus(
 	std::vector<double> iterations_par(core_number, 0);
 	
 	// Process the sigma divisions in parallel
+#ifdef _WIN32 
 	concurrency::parallel_for(0, static_cast<int>(core_number), [&](int process)
+#else
+	for (auto process = 0; process < core_number; ++process)
+#endif
 	{
 		const double last_sigma = (process + 1) * divisions_per_process * sigma_step;
 		double prev_sigma = process * divisions_per_process * sigma_step;
@@ -513,7 +532,10 @@ void MAGSAC<ModelEstimator, Model>::sigmaConsensus(
 			temp_sigma_inliers.emplace_back(all_residuals[sigma_idx].second);
 			next_sigma_2 = 2 * next_sigma * next_sigma;
 		}
-	});
+	}
+#ifdef _WIN32 
+	);
+#endif
 
 	// Collect all points which has higher probability of being inlier than zero
 	for (sigma_idx = 0; sigma_idx < Ni; sigma_idx += sigma_density_step)
@@ -548,7 +570,7 @@ void MAGSAC<ModelEstimator, Model>::sigmaConsensus(
 			score_.J); // The marginalized score
 		
 		iterations = marginalized_iteration_number; 
-		if (iterations < 0 || isnan(iterations))
+		if (iterations < 0 || std::isnan(iterations))
 			iterations = 1e5;
 		last_iteration_number = static_cast<int>(round(iterations)); 
 		refined_model_ = sigma_models[0];

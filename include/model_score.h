@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 /* RANSAC Scoring */
 class ModelScore
 {
