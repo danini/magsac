@@ -45,11 +45,6 @@ int main(int argc, const char* argv[])
 		The paper is readable here: https://arxiv.org/pdf/1803.07469.pdf
 		This implementation is not the one used in the experiments of the paper. 
 	*/
-
-	// The scene type
-	// The currently allowed values are: 'HomographyScene' and 'FundamentalMatrixScene'
-	SceneType test_type = SceneType::HomographyScene;
-
 	const double ransac_confidence = 0.99; // The required confidence in the results
 	const double sigma_max = 10; // The maximum sigma value allowed in MAGSAC
 	const bool draw_results = true; // A flag to draw and show the results 
