@@ -56,6 +56,7 @@ public:
 
 	// Given a model and a data point, calculate the error. Users should implement
 	// this function appropriately for the task being solved.
+	virtual double errorForScoring(const Datum& data_, const cv::Mat& model_) const = 0;
 	virtual double error(const Datum& data_, const Model& model_) const = 0;
 	virtual double error(const Datum& data_, const cv::Mat& model_) const = 0;
 

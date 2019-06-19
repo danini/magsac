@@ -303,7 +303,7 @@ void testHomographyFitting(
 	MAGSAC<RobustHomographyEstimator, Homography> magsac;
 	magsac.setSigmaMax(sigma_max_); // The maximum noise scale sigma allowed
 	magsac.setCoreNumber(4); // The number of cores used to speed up sigma-consensus
-	magsac.setPartitionNumber(10); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
+	magsac.setPartitionNumber(5); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
 
 	int iteration_number = 0; // Number of iterations required
 

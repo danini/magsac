@@ -599,7 +599,7 @@ void MAGSAC<ModelEstimator, Model>::getSigmaScore(
 	double max_distance = 0;
 	for (auto pt_idx = 0; pt_idx < N; ++pt_idx)
 	{
-		double residual = estimator_.error(points_.row(pt_idx), model_);
+		double residual = estimator_.errorForScoring(points_.row(pt_idx), model_.descriptor);
 		if (threshold > residual)
 		{
 			max_distance = MAX(max_distance, residual);

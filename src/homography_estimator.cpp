@@ -244,6 +244,14 @@ public:
 		return true;
 	}
 
+	double errorForScoring(
+		const cv::Mat& point,
+		const cv::Mat& descriptor) const
+	{
+		return error(point,
+			descriptor);
+	}
+
 	double error(const cv::Mat& point, 
 		const Homography& model) const
 	{

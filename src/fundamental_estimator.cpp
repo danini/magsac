@@ -226,6 +226,31 @@ public:
 		return true;
 	}
 
+	// Symmetric epipolar distance is used for the MAGSAC scoring because it is,
+	// in practice, more robust to degenerate cases but slightly less precise
+	// in terms of accuracy
+	double errorForScoring(
+		const cv::Mat& point,
+		const cv::Mat& descriptor) const
+	{
+		const double* p = (double*)descriptor.data;
+		const double* s = (double*)point.data;
+		const double x1 = *s;
+		const double y1 = *(s + 1);
+		const double x2 = *(s + 3);
+		const double y2 = *(s + 4);
+
+		const double rxc = *p * x2 + *(p + 3) * y2 + *(p + 6);
+		const double ryc = *(p + 1) * x2 + *(p + 4) * y2 + *(p + 7);
+		const double rwc = *(p + 2) * x2 + *(p + 5) * y2 + *(p + 8);
+		const double r = (x1 * rxc + y1 * ryc + rwc);
+		const double rx = *p * x1 + *(p + 1) * y1 + *(p + 2);
+		const double ry = *(p + 3) * x1 + *(p + 4) * y1 + *(p + 5);
+		const double a = rxc * rxc + ryc * ryc;
+		const double b = rx * rx + ry * ry;
+		return r * r * (a + b) / (a * b);
+	}
+
 	// Calculate the Sampson-distance of a point and a fundamental matrix
 	double error(
 		const cv::Mat& point, 
