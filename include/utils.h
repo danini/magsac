@@ -46,7 +46,8 @@ bool loadProjectionMatrix(
 void showImage(const cv::Mat& image_,
 	std::string window_name_,
 	int max_width_ = std::numeric_limits<int>::max(),
-	int max_height_ = std::numeric_limits<int>::max());
+	int max_height_ = std::numeric_limits<int>::max(),
+	bool wait_ = false);
 
 template <typename Model, typename Estimator>
 void refineManualLabeling(
@@ -266,7 +267,8 @@ void drawMatches(
 void showImage(const cv::Mat &image_,
 	std::string window_name_,
 	int max_width_,
-	int max_height_)
+	int max_height_,
+	bool wait_)
 {
 	// Resizing the window to fit into the screen if needed
 	int window_width = image_.cols,
@@ -289,5 +291,6 @@ void showImage(const cv::Mat &image_,
 	cv::namedWindow(window_name_, CV_WINDOW_NORMAL);
 	cv::resizeWindow(window_name_, window_width, window_height);
 	cv::imshow(window_name_, image_);
-	cv::waitKey(0);
+	if (wait_)
+		cv::waitKey(0);
 }

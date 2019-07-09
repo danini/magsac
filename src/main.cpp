@@ -47,7 +47,6 @@ int main(int argc, const char* argv[])
 		This implementation is not the one used in the experiments of the paper. 
 	*/
 	const double ransac_confidence = 0.99; // The required confidence in the results
-	const double sigma_max = 10; // The maximum sigma value allowed in MAGSAC
 	const bool draw_results = true; // A flag to draw and show the results 
 	// The inlier threshold for visualization. This threshold is not used by the algorithm,
 	// it is simply for selecting the inliers to be drawn after MAGSAC finished.
@@ -55,19 +54,48 @@ int main(int argc, const char* argv[])
 
 	// Test scenes for homography estimation
 	for (const auto& scene : getAvailableTestScenes(SceneType::HomographyScene))
+	{
+		printf("--------------------------------------------------------------\n");
+		printf("- Running MAGSAC with reasonably set maximum threshold (%f px)\n", 3.0);
 		testHomographyFitting(ransac_confidence,
-			sigma_max, // The maximum sigma value allowed in MAGSAC
+			3, // The maximum sigma value allowed in MAGSAC
 			scene, // The scene type
 			draw_results, // A flag to draw and show the results 
 			drawing_threshold); // The inlier threshold for visualization.
 
-	// Test scenes for fundamental matrix estimation
-	for (const auto& scene : getAvailableTestScenes(SceneType::FundamentalMatrixScene))
-		testFundamentalMatrixFitting(ransac_confidence, // The required confidence in the results
-			sigma_max, // The maximum sigma value allowed in MAGSAC
+		printf("- Running MAGSAC with extreme maximum threshold (%f px)\n", 10.0);
+		testHomographyFitting(ransac_confidence,
+			10, // The maximum sigma value allowed in MAGSAC
 			scene, // The scene type
 			draw_results, // A flag to draw and show the results 
 			drawing_threshold); // The inlier threshold for visualization.
+
+		printf("Press a button to continue.\n\n");
+		cv::waitKey(0);
+	}
+
+	// Test scenes for fundamental matrix estimation
+	for (const auto& scene : getAvailableTestScenes(SceneType::FundamentalMatrixScene))
+	{
+		printf("--------------------------------------------------------------\n");
+		printf("- Running MAGSAC with reasonably set maximum threshold (%f px)\n", 3.0);
+		testFundamentalMatrixFitting(ransac_confidence, // The required confidence in the results
+			3, // The maximum sigma value allowed in MAGSAC
+			scene, // The scene type
+			draw_results, // A flag to draw and show the results 
+			drawing_threshold); // The inlier threshold for visualization.
+
+
+		printf("- Running MAGSAC with extreme maximum threshold (%f px)\n", 10.0);
+		testFundamentalMatrixFitting(ransac_confidence, // The required confidence in the results
+			10, // The maximum sigma value allowed in MAGSAC
+			scene, // The scene type
+			draw_results, // A flag to draw and show the results 
+			drawing_threshold); // The inlier threshold for visualization.
+
+		printf("Press a button to continue.\n\n");
+		cv::waitKey(0);
+	}
 
 
 	return 0;
@@ -173,8 +201,9 @@ void testFundamentalMatrixFitting(
 	
 	MAGSAC<cv::Mat, FundamentalMatrixEstimator, FundamentalMatrix> magsac;
 	magsac.setSigmaMax(sigma_max_); // The maximum noise scale sigma allowed
-	magsac.setCoreNumber(4); // The number of cores used to speed up sigma-consensus
+	magsac.setCoreNumber(5); // The number of cores used to speed up sigma-consensus
 	magsac.setPartitionNumber(5); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
+	magsac.setIterationLimit(1e5); // Iteration limit to interrupt the cases when the algorithm run too long.
 
 	int iteration_number = 0; // Number of iterations required
 
@@ -227,8 +256,7 @@ void testFundamentalMatrixFitting(
 		drawMatches<double>(points, obtained_labeling, image1, image2, out_image);
 
 		// Show the matches
-		std::string window_name = "Visualization with threshold = " + std::to_string(drawing_threshold_) + " px";
-		printf("Press a button to continue.\n\n");
+		std::string window_name = "Visualization with threshold = " + std::to_string(drawing_threshold_) + " px; Maximum threshold is = " + std::to_string(sigma_max_);
 		showImage(out_image,
 			window_name,
 			1600,
@@ -310,8 +338,9 @@ void testHomographyFitting(
 
 	MAGSAC<cv::Mat, RobustHomographyEstimator, Homography> magsac;
 	magsac.setSigmaMax(sigma_max_); // The maximum noise scale sigma allowed
-	magsac.setCoreNumber(4); // The number of cores used to speed up sigma-consensus
+	magsac.setCoreNumber(5); // The number of cores used to speed up sigma-consensus
 	magsac.setPartitionNumber(5); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
+	magsac.setIterationLimit(1e5); // Iteration limit to interrupt the cases when the algorithm run too long.
 
 	int iteration_number = 0; // Number of iterations required
 
@@ -365,8 +394,7 @@ void testHomographyFitting(
 		drawMatches<double>(points, obtained_labeling, image1, image2, out_image);
 
 		// Show the matches
-		std::string window_name = "Visualization with threshold = " + std::to_string(drawing_threshold_) + " px";
-		printf("Press a button to continue.\n\n");
+		std::string window_name = "Visualization with threshold = " + std::to_string(drawing_threshold_) + " px; Maximum threshold is = " + std::to_string(sigma_max_);
 		showImage(out_image,
 			window_name,
 			1600,
