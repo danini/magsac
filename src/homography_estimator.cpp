@@ -51,27 +51,50 @@ public:
 		std::vector<Homography>* models) const // Estimated model(s)
 	{
 		static const auto M = sampleSize(); // Size of a minimal sample
-		static std::vector<cv::Point2d> points_src(M), // Points in the first image
-			points_dst(M); // Points in the second image
 
-		// Copying the sample coordinates
+		// Copying the sample coordinates and building the coefficient matrix
+		static cv::Mat coefficients(8, 8, CV_64F);
+		static cv::Mat inhomogeneous(8, 1, CV_64F);
+		double *A_ptr = reinterpret_cast<double *>(coefficients.data);
+		double *b_ptr = reinterpret_cast<double *>(inhomogeneous.data);
+		const double *data_ptr = reinterpret_cast<double*>(data.data);
+		const size_t offset = data.cols;
+		size_t smpl;
+		double x1, y1, x2, y2;
+
 		for (auto i = 0; i < M; ++i)
 		{
-			points_src[i].x = static_cast<double>(data.at<double>(sample[i], 0));
-			points_src[i].y = static_cast<double>(data.at<double>(sample[i], 1));
-			points_dst[i].x = static_cast<double>(data.at<double>(sample[i], 3));
-			points_dst[i].y = static_cast<double>(data.at<double>(sample[i], 4));
+			smpl = sample[i] * offset;
+			x1 = data_ptr[smpl];
+			y1 = data_ptr[smpl + 1];
+
+			x2 = data_ptr[smpl + 3];
+			y2 = data_ptr[smpl + 4];
+
+			(*A_ptr++) = -x1;
+			(*A_ptr++) = -y1;
+			(*A_ptr++) = -1;
+			(*A_ptr++) = 0;
+			(*A_ptr++) = 0;
+			(*A_ptr++) = 0;
+			(*A_ptr++) = x2 * x1;
+			(*A_ptr++) = x2 * y1;
+			(*b_ptr++) = -x2;
+
+			(*A_ptr++) = 0;
+			(*A_ptr++) = 0;
+			(*A_ptr++) = 0;
+			(*A_ptr++) = -x1;
+			(*A_ptr++) = -y1;
+			(*A_ptr++) = -1;
+			(*A_ptr++) = y2 * x1;
+			(*A_ptr++) = y2 * y1;
+			(*b_ptr++) = -y2;
 		}
 
-		// Estimate the homography using OpenCV's function
-		// TODO: replace it by a faster algorithm
-		cv::Mat H = findHomography(points_src, points_dst);
-		H.convertTo(H, CV_64F); // Convert to double because OpenCV returns float matrix
-
-		// If the estimation failed, there are no rows in H 
-		if (H.rows == 0)
-			return false;
-
+		cv::Mat h = coefficients.inv() * inhomogeneous;
+		h.push_back(1.0);
+		cv::Mat H(3, 3, CV_64F, h.data);
 		Homography model(H); // Initilize the model
 		models->emplace_back(model);
 		return true;
