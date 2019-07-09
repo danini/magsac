@@ -5,12 +5,13 @@
 #include <chrono>
 #include <memory>
 #include "model_score.h"
+#include "sampler.h"
 
 #ifdef _WIN32 
 	#include <ppl.h>
 #endif
 
-template <class ModelEstimator, class Model>
+template <class DatumType, class ModelEstimator, class Model>
 class MAGSAC  
 {
 public:
@@ -36,6 +37,7 @@ public:
 		const cv::Mat &points_, 
 		const double confidence_,
 		ModelEstimator& estimator_,
+		Sampler<DatumType>& sampler_,
 		Model &obtained_model_,  
 		int &iteration_number_);
 
@@ -98,12 +100,6 @@ protected:
 	size_t partition_number; // Number of partitions used to speed up sigma-consensus
 	double interrupting_threshold; // A threshold to speed up MAGSAC by interrupting the sigma-consensus procedure whenever there is no chance of being better than the previous so-far-the-best model
 
-	bool sample(
-		const cv::Mat& points_,
-		std::vector<int>& pool_,
-		const int sample_size_,
-		int* sample_);
-
 	void getSigmaScore(
 		const cv::Mat& points_,
 		Model& model_,
@@ -127,11 +123,12 @@ protected:
 		const ModelScore& best_score_);
 };
 
-template <class ModelEstimator, class Model>
-void MAGSAC<ModelEstimator, Model>::run(
+template <class DatumType, class ModelEstimator, class Model>
+void MAGSAC<DatumType, ModelEstimator, Model>::run(
 	const cv::Mat& points_,
 	const double confidence_,
 	ModelEstimator& estimator_,
+	Sampler<DatumType>& sampler_,
 	Model& obtained_model_,
 	int& iteration_number_)
 {
@@ -147,10 +144,12 @@ void MAGSAC<ModelEstimator, Model>::run(
 	ModelScore so_far_the_best_score; // The score of the current best model
 	std::unique_ptr<int[]> minimal_sample(new int[sample_size]); // The sample used for the estimation
 	
-	// Initializing the pool for sampling
-	std::vector<int> pool(points_.rows);
-	for (int i = 0; i < points_.rows; ++i)
-		pool[i] = i; 
+	if (points_.rows < sample_size)
+	{	
+		fprintf(stderr, "There are not enough points for applying robust estimation. Minimum is %d; while %d are given.\n", 
+			sample_size, points_.rows);
+		return;
+	}
 
 	// Set the start time variable if there is some time limit set
 	if (desired_fps > -1)
@@ -167,10 +166,10 @@ void MAGSAC<ModelEstimator, Model>::run(
 		while (1)
 		{
 			// Get a minimal sample randomly
-			if (!sample(points_, 
-				pool, 
+			if (!sampler_.sample(points_, 
+				points_.rows, 
 				sample_size, 
-				minimal_sample.get()))
+				minimal_sample.get()))		
 				continue;
 			 
 			// Estimate the model from the minimal sample
@@ -238,8 +237,8 @@ void MAGSAC<ModelEstimator, Model>::run(
 	iteration_number_ = iteration;
 }
 
-template <class ModelEstimator, class Model>
-void MAGSAC<ModelEstimator, Model>::postProcessing(
+template <class DatumType, class ModelEstimator, class Model>
+void MAGSAC<DatumType, ModelEstimator, Model>::postProcessing(
 	const cv::Mat &points_,
 	const Model &model_,
 	Model &refined_model_,
@@ -373,8 +372,8 @@ void MAGSAC<ModelEstimator, Model>::postProcessing(
 }
 
 
-template <class ModelEstimator, class Model>
-void MAGSAC<ModelEstimator, Model>::sigmaConsensus(
+template <class DatumType, class ModelEstimator, class Model>
+void MAGSAC<DatumType, ModelEstimator, Model>::sigmaConsensus(
 	const cv::Mat &points_,
 	const Model& model_,
 	Model& refined_model_,
@@ -577,8 +576,8 @@ void MAGSAC<ModelEstimator, Model>::sigmaConsensus(
 	}
 }
 
-template <class ModelEstimator, class Model>
-void MAGSAC<ModelEstimator, Model>::getSigmaScore(
+template <class DatumType, class ModelEstimator, class Model>
+void MAGSAC<DatumType, ModelEstimator, Model>::getSigmaScore(
 	const cv::Mat &points_,
 	Model &model_,
 	const ModelEstimator &estimator_,
@@ -652,28 +651,4 @@ void MAGSAC<ModelEstimator, Model>::getSigmaScore(
 		marginalized_iteration_number_ = (marginalized_iteration_number_ + log_confidence / log(1 - pow(inliers[i] / Nf, M)));
 	}
 	marginalized_iteration_number_ = marginalized_iteration_number_ / (partition_number - 1);
-}
-
-template <class ModelEstimator, class Model>
-bool MAGSAC<ModelEstimator, Model>::sample(
-	const cv::Mat& points_,
-	std::vector<int>& pool_,
-	const int sample_size_,
-	int* sample_)
-{
-	if (pool_.size() < sample_size_)
-		return false;
-
-	// TODO: Replace with a smarter sampler, e.g. PROSAC
-	for (int i = 0; i < sample_size_; ++i)
-	{
-		const int idx = (pool_.size() - 1) * static_cast<double>(rand()) / RAND_MAX;
-		sample_[i] = pool_[idx];
-		pool_.erase(pool_.begin() + idx);
-	}
-
-	pool_.reserve(pool_.size() + sample_size_);
-	for (int i = 0; i < sample_size_; ++i)
-		pool_.emplace_back(sample_[i]);
-	return true;
 }

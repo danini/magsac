@@ -13,6 +13,7 @@
 
 #include "utils.h"
 #include "magsac.h"
+#include "uniform_sampler.h"
 #include "fundamental_estimator.cpp"
 #include "homography_estimator.cpp"
 
@@ -166,8 +167,11 @@ void testFundamentalMatrixFitting(
 	printf("Number of ground truth inliers = %d.\n", static_cast<int>(I));
 	printf("Theoretical RANSAC iteration number at %.2f confidence = %d.\n",
 		ransac_confidence_, static_cast<int>(log(1.0 - ransac_confidence_) / log(1.0 - pow(static_cast<double>(I) / static_cast<double>(N), 4))));
+
+	// Initialize the sampler used for selecting minimal samples
+	UniformSampler<cv::Mat> sampler(N);
 	
-	MAGSAC<FundamentalMatrixEstimator, FundamentalMatrix> magsac;
+	MAGSAC<cv::Mat, FundamentalMatrixEstimator, FundamentalMatrix> magsac;
 	magsac.setSigmaMax(sigma_max_); // The maximum noise scale sigma allowed
 	magsac.setCoreNumber(4); // The number of cores used to speed up sigma-consensus
 	magsac.setPartitionNumber(5); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
@@ -179,6 +183,7 @@ void testFundamentalMatrixFitting(
 	magsac.run(points, // The data points
 		ransac_confidence_, // The required confidence in the results
 		estimator, // The used estimator
+		sampler, // The sampler used for selecting minimal samples in each iteration
 		model, // The estimated model
 		iteration_number); // The number of iterations
 	end = std::chrono::system_clock::now();
@@ -300,7 +305,10 @@ void testHomographyFitting(
 	printf("Theoretical RANSAC iteration number at %.2f confidence = %d.\n", 
 		ransac_confidence_, static_cast<int>(log(1.0 - ransac_confidence_) / log(1.0 - pow(static_cast<double>(I) / static_cast<double>(N), 4))));
 
-	MAGSAC<RobustHomographyEstimator, Homography> magsac;
+	// Initialize the sampler used for selecting minimal samples
+	UniformSampler<cv::Mat> sampler(N);
+
+	MAGSAC<cv::Mat, RobustHomographyEstimator, Homography> magsac;
 	magsac.setSigmaMax(sigma_max_); // The maximum noise scale sigma allowed
 	magsac.setCoreNumber(4); // The number of cores used to speed up sigma-consensus
 	magsac.setPartitionNumber(5); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
@@ -312,6 +320,7 @@ void testHomographyFitting(
 	magsac.run(points, // The data points
 		ransac_confidence_, // The required confidence in the results
 		estimator, // The used estimator
+		sampler, // The sampler used for selecting minimal samples in each iteration
 		model, // The estimated model
 		iteration_number); // The number of iterations
 	end = std::chrono::system_clock::now();
