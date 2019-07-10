@@ -18,6 +18,7 @@
 #include "homography_estimator.cpp"
 
 enum SceneType { FundamentalMatrixScene, HomographyScene };
+enum Dataset { kusvod2, extremeview, homogr, adelaidermf, multih };
 
 // A method applying MAGSAC for fundamental matrix estimation to one of the built-in scenes
 void testFundamentalMatrixFitting(
@@ -37,7 +38,18 @@ void testHomographyFitting(
 
 // The names of built-in scenes
 std::vector<std::string> getAvailableTestScenes(
-	SceneType scene_type_);
+	SceneType scene_type_,
+	Dataset dataset_);
+
+// Running tests on the selected dataset
+void runTest(SceneType scene_type_, 
+	Dataset dataset_,
+	const double ransac_confidence_,
+	const bool draw_results_,
+	const double drawing_threshold_);
+
+// Returns the name of the selected dataset
+std::string dataset2str(Dataset dataset_);
 
 int main(int argc, const char* argv[])
 {
@@ -52,92 +64,141 @@ int main(int argc, const char* argv[])
 	// it is simply for selecting the inliers to be drawn after MAGSAC finished.
 	const double drawing_threshold = 1.0;
 
-	// Test scenes for homography estimation
-	for (const auto& scene : getAvailableTestScenes(SceneType::HomographyScene))
-	{
-		printf("--------------------------------------------------------------\n");
-		printf("Homography estimation on scene \"%s\".\n", scene.c_str());
-		printf("--------------------------------------------------------------\n");
-		printf("- Running MAGSAC with reasonably set maximum threshold (%f px)\n", 3.0);
-		testHomographyFitting(ransac_confidence,
-			3, // The maximum sigma value allowed in MAGSAC
-			scene, // The scene type
-			draw_results, // A flag to draw and show the results 
-			drawing_threshold); // The inlier threshold for visualization.
-
-		printf("\n- Running MAGSAC with extreme maximum threshold (%f px)\n", 10.0);
-		testHomographyFitting(ransac_confidence,
-			10, // The maximum sigma value allowed in MAGSAC
-			scene, // The scene type
-			draw_results, // A flag to draw and show the results 
-			drawing_threshold); // The inlier threshold for visualization.
-
-		printf("Press a button to continue.\n\n");
-		cv::waitKey(0);
-	}
-
-	// Test scenes for fundamental matrix estimation
-	for (const auto& scene : getAvailableTestScenes(SceneType::FundamentalMatrixScene))
-	{
-		printf("--------------------------------------------------------------\n");
-		printf("Fundamental matrix estimation on scene \"%s\".\n", scene.c_str());
-		printf("- Running MAGSAC with reasonably set maximum threshold (%f px)\n", 3.0);
-		testFundamentalMatrixFitting(ransac_confidence, // The required confidence in the results
-			3, // The maximum sigma value allowed in MAGSAC
-			scene, // The scene type
-			draw_results, // A flag to draw and show the results 
-			drawing_threshold); // The inlier threshold for visualization.
-
-
-		printf("\n- Running MAGSAC with extreme maximum threshold (%f px)\n", 10.0);
-		testFundamentalMatrixFitting(ransac_confidence, // The required confidence in the results
-			10, // The maximum sigma value allowed in MAGSAC
-			scene, // The scene type
-			draw_results, // A flag to draw and show the results 
-			drawing_threshold); // The inlier threshold for visualization.
-
-		printf("Press a button to continue.\n\n");
-		cv::waitKey(0);
-	}
-
+	runTest(SceneType::HomographyScene, Dataset::homogr, ransac_confidence, draw_results, drawing_threshold);
+	runTest(SceneType::FundamentalMatrixScene, Dataset::homogr, ransac_confidence, draw_results, drawing_threshold);
+	runTest(SceneType::FundamentalMatrixScene, Dataset::adelaidermf, ransac_confidence, draw_results, drawing_threshold);
+	runTest(SceneType::FundamentalMatrixScene, Dataset::multih, ransac_confidence, draw_results, drawing_threshold);
+	runTest(SceneType::HomographyScene, Dataset::extremeview, ransac_confidence, draw_results, drawing_threshold);
 
 	return 0;
 } 
 
-std::vector<std::string> getAvailableTestScenes(SceneType scene_type_)
+void runTest(SceneType scene_type_, 
+	Dataset dataset_,
+	const double ransac_confidence_,
+	const bool draw_results_,
+	const double drawing_threshold_)
+{
+	const std::string dataset_name = dataset2str(dataset_);
+	const std::string problem_name = scene_type_ == SceneType::HomographyScene ?
+		"Homography" : 
+		"Fundamental matrix";	
+
+	// Test scenes for homography estimation
+	for (const auto& scene : getAvailableTestScenes(scene_type_, dataset_))
+	{
+		printf("--------------------------------------------------------------\n");
+		printf("%s estimation on scene \"%s\" from dataset \"%s\".\n", 
+			problem_name.c_str(), scene.c_str(), dataset_name.c_str());
+		printf("--------------------------------------------------------------\n");
+
+		if (scene_type_ == SceneType::HomographyScene)
+		{
+			printf("- Running MAGSAC with reasonably set maximum threshold (%f px)\n", 3.0);
+			testHomographyFitting(ransac_confidence_,
+				3, // The maximum sigma value allowed in MAGSAC
+				scene, // The scene type
+				draw_results_, // A flag to draw and show the results 
+				drawing_threshold_); // The inlier threshold for visualization.
+
+			printf("\n- Running MAGSAC with extreme maximum threshold (%f px)\n", 10.0);
+			testHomographyFitting(ransac_confidence_,
+				10, // The maximum sigma value allowed in MAGSAC
+				scene, // The scene type
+				draw_results_, // A flag to draw and show the results 
+				drawing_threshold_); // The inlier threshold for visualization.
+		} else
+		{
+			printf("- Running MAGSAC with reasonably set maximum threshold (%f px)\n", 3.0);
+			testFundamentalMatrixFitting(ransac_confidence_, // The required confidence in the results
+				3, // The maximum sigma value allowed in MAGSAC
+				scene, // The scene type
+				draw_results_, // A flag to draw and show the results 
+				drawing_threshold_); // The inlier threshold for visualization.
+
+
+			printf("\n- Running MAGSAC with extreme maximum threshold (%f px)\n", 10.0);
+			testFundamentalMatrixFitting(ransac_confidence_, // The required confidence in the results
+				10, // The maximum sigma value allowed in MAGSAC
+				scene, // The scene type
+				draw_results_, // A flag to draw and show the results 
+				drawing_threshold_); // The inlier threshold for visualization.
+		}
+
+		printf("Press a button to continue.\n\n");
+		cv::waitKey(0);
+	}
+}
+
+std::string dataset2str(Dataset dataset_)
+{
+	switch (dataset_)	
+	{	
+		case Dataset::homogr:
+			return "homogr";
+		case Dataset::extremeview:
+			return "extremeview";
+		case Dataset::kusvod2:
+			return "homkusvod2ogr";
+		case Dataset::adelaidermf:
+			return "adelaidermf";
+		case Dataset::multih:
+			return "multih";
+		default:
+			return "unknown";
+	}
+}
+
+std::vector<std::string> getAvailableTestScenes(SceneType scene_type_, 
+	Dataset dataset_)
 {
 	switch (scene_type_)
 	{
 	case SceneType::HomographyScene: // Available test scenes for homography estimation
-		return { "LePoint1", "LePoint2", "LePoint3", // "homogr" dataset
-			"graf", "ExtremeZoom", "city", 
-			"CapitalRegion", "BruggeTower", "BruggeSquare", 
-			"BostonLib", "boat", "adam", 
-			"WhiteBoard", "Eiffel", "Brussels", 
-			"Boston",
-			"extremeview/adam", "extremeview/cafe", "extremeview/cat", // "EVD" (i.e. extremeview) dataset
-			"extremeview/dum", "extremeview/face", "extremeview/fox", 
-			"extremeview/girl", "extremeview/graf", "extremeview/grand", 
-			"extremeview/index", "extremeview/mag", "extremeview/pkk", 
-			"extremeview/shop", "extremeview/there", "extremeview/vin", 
-		};
+		switch (dataset_)	
+		{	
+			case Dataset::homogr:
+				return { "LePoint1", "LePoint2", "LePoint3", // "homogr" dataset
+					"graf", "ExtremeZoom", "city", 
+					"CapitalRegion", "BruggeTower", "BruggeSquare", 
+					"BostonLib", "boat", "adam", 
+					"WhiteBoard", "Eiffel", "Brussels", 
+					"Boston"};
+			case Dataset::extremeview:
+				return {"extremeview/adam", "extremeview/cafe", "extremeview/cat", // "EVD" (i.e. extremeview) dataset
+					"extremeview/dum", "extremeview/face", "extremeview/fox", 
+					"extremeview/girl", "extremeview/graf", "extremeview/grand", 
+					"extremeview/index", "extremeview/mag", "extremeview/pkk", 
+					"extremeview/shop", "extremeview/there", "extremeview/vin"};
+
+			default:
+				return std::vector<std::string>();
+		}
 
 	case SceneType::FundamentalMatrixScene:
-		return {"corr", "booksh", "box",
-			"castle", "graff", "head",
-			"kampa", "leafs", "plant",
-			"rotunda", "shout", "valbonne",
-			"wall", "wash", "zoom",
-			"Kyoto", "barrsmith", "bonhall",
-			"bonython", "elderhalla", "elderhallb",
-			"hartley", "johnssonb", "ladysymon", 
-			"library", "napiera", "napierb", 
-			"nese", "oldclassicswing", "physics", 
-			"sene", "unihouse", "unionhouse", 
-			"boxesandbooks", "glasscaseb", "stairs"};
-
+		switch (dataset_)	
+		{	
+			case Dataset::kusvod2:
+				return {"corr", "booksh", "box",
+					"castle", "graff", "head",
+					"kampa", "leafs", "plant",
+					"rotunda", "shout", "valbonne",
+					"wall", "wash", "zoom",
+					"Kyoto"};
+			case Dataset::adelaidermf:
+				return {"barrsmith", "bonhall",
+					"bonython", "elderhalla", "elderhallb",
+					"hartley", "johnssonb", "ladysymon", 
+					"library", "napiera", "napierb", 
+					"nese", "oldclassicswing", "physics", 
+					"sene", "unihouse", "unionhouse"};
+			case Dataset::multih:
+				return {"boxesandbooks", "glasscaseb", "stairs"};
+			default:
+				return std::vector<std::string>();
+		}
 	default:
-		break;
+		return std::vector<std::string>();
 	}
 }
 
