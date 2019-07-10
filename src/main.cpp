@@ -36,6 +36,20 @@ void testHomographyFitting(
 	bool draw_results_ = false,
 	double drawing_threshold_ = 2);
 
+// A method applying OpenCV for homography estimation to one of the built-in scenes
+void opencvHomographyFitting(
+	double ransac_confidence_,
+	double threshold_,
+	std::string test_scene_,
+	bool draw_results_ = false);
+
+// A method applying OpenCV for fundamental matrix estimation to one of the built-in scenes
+void opencvFundamentalMatrixFitting(
+	double ransac_confidence_,
+	double threshold_,
+	std::string test_scene_,
+	bool draw_results_ = false);
+
 // The names of built-in scenes
 std::vector<std::string> getAvailableTestScenes(
 	SceneType scene_type_,
@@ -64,11 +78,11 @@ int main(int argc, const char* argv[])
 	// it is simply for selecting the inliers to be drawn after MAGSAC finished.
 	const double drawing_threshold = 1.0;
 
-	runTest(SceneType::HomographyScene, Dataset::homogr, ransac_confidence, draw_results, drawing_threshold);
-	runTest(SceneType::FundamentalMatrixScene, Dataset::homogr, ransac_confidence, draw_results, drawing_threshold);
+	runTest(SceneType::FundamentalMatrixScene, Dataset::kusvod2, ransac_confidence, draw_results, drawing_threshold);
 	runTest(SceneType::FundamentalMatrixScene, Dataset::adelaidermf, ransac_confidence, draw_results, drawing_threshold);
 	runTest(SceneType::FundamentalMatrixScene, Dataset::multih, ransac_confidence, draw_results, drawing_threshold);
 	runTest(SceneType::HomographyScene, Dataset::extremeview, ransac_confidence, draw_results, drawing_threshold);
+	runTest(SceneType::HomographyScene, Dataset::homogr, ransac_confidence, draw_results, drawing_threshold);
 
 	return 0;
 } 
@@ -94,7 +108,13 @@ void runTest(SceneType scene_type_,
 
 		if (scene_type_ == SceneType::HomographyScene)
 		{
-			printf("- Running MAGSAC with reasonably set maximum threshold (%f px)\n", 3.0);
+			printf("- Running OpenCV's RANSAC with threshold %f px\n", 3.0);
+			opencvHomographyFitting(ransac_confidence_,
+				3, // The maximum sigma value allowed in MAGSAC
+				scene, // The scene type
+				false); // A flag to draw and show the results
+
+			printf("\n- Running MAGSAC with reasonably set maximum threshold (%f px)\n", 3.0);
 			testHomographyFitting(ransac_confidence_,
 				3, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
@@ -109,7 +129,13 @@ void runTest(SceneType scene_type_,
 				drawing_threshold_); // The inlier threshold for visualization.
 		} else
 		{
-			printf("- Running MAGSAC with reasonably set maximum threshold (%f px)\n", 3.0);
+			printf("- Running OpenCV's RANSAC with threshold %f px\n", 3.0);
+			opencvFundamentalMatrixFitting(ransac_confidence_,
+				3, // The maximum sigma value allowed in MAGSAC
+				scene, // The scene type
+				false); // A flag to draw and show the results
+
+			printf("\n- Running MAGSAC with reasonably set maximum threshold (%f px)\n", 3.0);
 			testFundamentalMatrixFitting(ransac_confidence_, // The required confidence in the results
 				3, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
@@ -139,7 +165,7 @@ std::string dataset2str(Dataset dataset_)
 		case Dataset::extremeview:
 			return "extremeview";
 		case Dataset::kusvod2:
-			return "homkusvod2ogr";
+			return "kusvod2";
 		case Dataset::adelaidermf:
 			return "adelaidermf";
 		case Dataset::multih:
@@ -323,7 +349,7 @@ void testFundamentalMatrixFitting(
 
 		// Draw the matches to the images
 		cv::Mat out_image;
-		drawMatches<double>(points, obtained_labeling, image1, image2, out_image);
+		drawMatches<double, int>(points, obtained_labeling, image1, image2, out_image);
 
 		// Show the matches
 		std::string window_name = "Visualization with threshold = " + std::to_string(drawing_threshold_) + " px; Maximum threshold is = " + std::to_string(sigma_max_);
@@ -461,10 +487,239 @@ void testHomographyFitting(
 
 		// Draw the matches to the images
 		cv::Mat out_image;
-		drawMatches<double>(points, obtained_labeling, image1, image2, out_image);
+		drawMatches<double, int>(points, obtained_labeling, image1, image2, out_image);
 
 		// Show the matches
 		std::string window_name = "Visualization with threshold = " + std::to_string(drawing_threshold_) + " px; Maximum threshold is = " + std::to_string(sigma_max_);
+		showImage(out_image,
+			window_name,
+			1600,
+			900);
+		out_image.release();
+	}
+
+	// Clean up the memory occupied by the images
+	image1.release();
+	image2.release();
+}
+
+void opencvHomographyFitting(
+	double ransac_confidence_,
+	double threshold_,
+	std::string test_scene_,
+	bool draw_results_)
+{
+	printf("Processed scene = '%s'.\n", test_scene_.c_str());
+
+	// Load the images of the current test scene
+	cv::Mat image1 = cv::imread("data/homography/" + test_scene_ + "A.png");
+	cv::Mat image2 = cv::imread("data/homography/" + test_scene_ + "B.png");
+	if (image1.cols == 0)
+	{
+		image1 = cv::imread("data/homography/" + test_scene_ + "A.jpg");
+		image2 = cv::imread("data/homography/" + test_scene_ + "B.jpg");
+	}
+
+	if (image1.cols == 0)
+	{
+		fprintf(stderr, "A problem occured when loading the images for test scene '%s'\n", test_scene_.c_str());
+		return;
+	}
+
+	cv::Mat points; // The point correspondences, each is of format x1 y1 1 x2 y2 1
+	std::vector<int> ground_truth_labels; // The ground truth labeling provided in the dataset
+
+	// A function loading the points from files
+	readAnnotatedPoints("data/homography/" + test_scene_ + "_pts.txt", 
+		points, 
+		ground_truth_labels);
+
+	// The number of points in the datasets
+	const size_t N = points.rows; // The number of points in the scene
+
+	if (N == 0) // If there are no points, return
+	{
+		fprintf(stderr, "A problem occured when loading the annotated points for test scene '%s'\n", test_scene_.c_str());
+		return;
+	}
+
+	RobustHomographyEstimator estimator; // The robust homography estimator class containing the function for the fitting and residual calculation
+	Homography model; // The estimated model
+
+	// In this used datasets, the manually selected inliers are not all inliers but a subset of them.
+	// Therefore, the manually selected inliers are augmented as follows: 
+	// (i) First, the implied model is estimated from the manually selected inliers.
+	// (ii) Second, the inliers of the ground truth model are selected.
+	refineManualLabeling<Homography, RobustHomographyEstimator>(
+		points,
+		ground_truth_labels,
+		estimator,
+		2.0);
+
+	// Select the inliers from the labeling
+	std::vector<int> ground_truth_inliers = getSubsetFromLabeling(ground_truth_labels, 1);
+	const size_t I = static_cast<double>(ground_truth_inliers.size());
+
+	printf("Estimated model = '%s'.\n", estimator.modelName().c_str());
+	printf("Number of correspondences loaded = %d.\n", static_cast<int>(N));
+	printf("Number of ground truth inliers = %d.\n", static_cast<int>(I));
+
+	// Define location of sub matrices in data matrix
+	cv::Rect roi1( 0, 0, 3, N );  
+	cv::Rect roi2( 3, 0, 3, N );   
+
+	std::vector<int> obtained_labeling(points.rows, 0);
+	std::chrono::time_point<std::chrono::system_clock> end, 
+		start = std::chrono::system_clock::now();
+	cv::Mat homography = cv::findHomography(cv::Mat(points, roi1), 
+		cv::Mat(points, roi2),
+		CV_RANSAC,
+		threshold_,
+		obtained_labeling);
+	end = std::chrono::system_clock::now();
+	 
+	std::chrono::duration<double> elapsed_seconds = end - start;
+	std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+
+	printf("Elapsed time: %f secs\n", elapsed_seconds.count());
+	 
+	// Compute the RMSE given the ground truth inliers
+	double rmse = 0, error;
+	size_t inlier_number = 0;
+	for (const auto& inlier_idx : ground_truth_inliers)
+	{
+		error = estimator.error(points.row(inlier_idx), homography);
+		rmse += error;
+	}
+	rmse = sqrt(rmse / static_cast<double>(I));
+	printf("RMSE error: %f px\n", rmse);
+
+	// Visualization part.
+	// Inliers are selected using threshold and the estimated model. 
+	// This part is not necessary and is only for visualization purposes. 
+	if (draw_results_)
+	{
+		// Draw the matches to the images
+		cv::Mat out_image;
+		drawMatches<double, int>(points, obtained_labeling, image1, image2, out_image);
+
+		// Show the matches
+		std::string window_name = "OpenCV's RANSAC";
+		showImage(out_image,
+			window_name,
+			1600,
+			900);
+		out_image.release();
+	}
+
+	// Clean up the memory occupied by the images
+	image1.release();
+	image2.release();
+}
+
+void opencvFundamentalMatrixFitting(
+	double ransac_confidence_,
+	double threshold_,
+	std::string test_scene_,
+	bool draw_results_)
+{
+	printf("Processed scene = '%s'.\n", test_scene_.c_str());
+
+	// Load the images of the current test scene
+	cv::Mat image1 = cv::imread("data/fundamental_matrix/" + test_scene_ + "A.png");
+	cv::Mat image2 = cv::imread("data/fundamental_matrix/" + test_scene_ + "B.png");
+	if (image1.cols == 0)
+	{
+		image1 = cv::imread("data/fundamental_matrix/" + test_scene_ + "A.jpg");
+		image2 = cv::imread("data/fundamental_matrix/" + test_scene_ + "B.jpg");
+	}
+
+	if (image1.cols == 0)
+	{
+		fprintf(stderr, "A problem occured when loading the images for test scene '%s'\n", test_scene_.c_str());
+		return;
+	}
+
+	cv::Mat points; // The point correspondences, each is of format x1 y1 1 x2 y2 1
+	std::vector<int> ground_truth_labels; // The ground truth labeling provided in the dataset
+
+	// A function loading the points from files
+	readAnnotatedPoints("data/fundamental_matrix/" + test_scene_ + "_pts.txt",
+		points,
+		ground_truth_labels);
+
+	// The number of points in the datasets
+	const size_t N = points.rows; // The number of points in the scene
+
+	if (N == 0) // If there are no points, return
+	{
+		fprintf(stderr, "A problem occured when loading the annotated points for test scene '%s'\n", test_scene_.c_str());
+		return;
+	}
+
+	FundamentalMatrixEstimator estimator; // The robust homography estimator class containing the function for the fitting and residual calculation
+	FundamentalMatrix model; // The estimated model
+
+	// In this used datasets, the manually selected inliers are not all inliers but a subset of them.
+	// Therefore, the manually selected inliers are augmented as follows: 
+	// (i) First, the implied model is estimated from the manually selected inliers.
+	// (ii) Second, the inliers of the ground truth model are selected.
+	refineManualLabeling<FundamentalMatrix, FundamentalMatrixEstimator>(
+		points,
+		ground_truth_labels,
+		estimator,
+		0.35);
+
+	// Select the inliers from the labeling
+	std::vector<int> ground_truth_inliers = getSubsetFromLabeling(ground_truth_labels, 1);
+	const size_t I = static_cast<double>(ground_truth_inliers.size());
+
+	printf("Estimated model = '%s'.\n", estimator.modelName().c_str());
+	printf("Number of correspondences loaded = %d.\n", static_cast<int>(N));
+	printf("Number of ground truth inliers = %d.\n", static_cast<int>(I));
+
+	// Define location of sub matrices in data matrix
+	cv::Rect roi1( 0, 0, 3, N );  
+	cv::Rect roi2( 3, 0, 3, N );   
+
+	std::vector<uchar> obtained_labeling(points.rows, 0);
+	std::chrono::time_point<std::chrono::system_clock> end, 
+		start = std::chrono::system_clock::now();
+	cv::Mat fundamental_matrix = cv::findFundamentalMat(cv::Mat(points, roi1), 
+		cv::Mat(points, roi2),
+		CV_FM_RANSAC,
+		threshold_,
+		ransac_confidence_,
+		obtained_labeling);
+	end = std::chrono::system_clock::now();
+	 
+	std::chrono::duration<double> elapsed_seconds = end - start;
+	std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+
+	printf("Elapsed time: %f secs\n", elapsed_seconds.count());
+	 
+	// Compute the RMSE given the ground truth inliers
+	double rmse = 0, error;
+	size_t inlier_number = 0;
+	for (const auto& inlier_idx : ground_truth_inliers)
+	{
+		error = estimator.error(points.row(inlier_idx), fundamental_matrix);
+		rmse += error;
+	}
+	rmse = sqrt(rmse / static_cast<double>(I));
+	printf("RMSE error: %f px\n", rmse);
+
+	// Visualization part.
+	// Inliers are selected using threshold and the estimated model. 
+	// This part is not necessary and is only for visualization purposes. 
+	if (draw_results_)
+	{
+		// Draw the matches to the images
+		cv::Mat out_image;
+		drawMatches<double, uchar>(points, obtained_labeling, image1, image2, out_image);
+
+		// Show the matches
+		std::string window_name = "OpenCV's RANSAC";
 		showImage(out_image,
 			window_name,
 			1600,

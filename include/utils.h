@@ -220,10 +220,10 @@ void readAnnotatedPoints(
 	}
 }
 
-template<typename T>
+template<typename T, typename LabelType>
 void drawMatches(
 	const cv::Mat &points_, 
-	const std::vector<int>& labeling_,
+	const std::vector<LabelType>& labeling_,
 	const cv::Mat& image1_,
 	const cv::Mat& image2_,
 	cv::Mat& out_image_)
