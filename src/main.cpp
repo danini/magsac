@@ -56,6 +56,8 @@ int main(int argc, const char* argv[])
 	for (const auto& scene : getAvailableTestScenes(SceneType::HomographyScene))
 	{
 		printf("--------------------------------------------------------------\n");
+		printf("Homography estimation on scene \"%s\".\n", scene.c_str());
+		printf("--------------------------------------------------------------\n");
 		printf("- Running MAGSAC with reasonably set maximum threshold (%f px)\n", 3.0);
 		testHomographyFitting(ransac_confidence,
 			3, // The maximum sigma value allowed in MAGSAC
@@ -63,7 +65,7 @@ int main(int argc, const char* argv[])
 			draw_results, // A flag to draw and show the results 
 			drawing_threshold); // The inlier threshold for visualization.
 
-		printf("- Running MAGSAC with extreme maximum threshold (%f px)\n", 10.0);
+		printf("\n- Running MAGSAC with extreme maximum threshold (%f px)\n", 10.0);
 		testHomographyFitting(ransac_confidence,
 			10, // The maximum sigma value allowed in MAGSAC
 			scene, // The scene type
@@ -78,6 +80,7 @@ int main(int argc, const char* argv[])
 	for (const auto& scene : getAvailableTestScenes(SceneType::FundamentalMatrixScene))
 	{
 		printf("--------------------------------------------------------------\n");
+		printf("Fundamental matrix estimation on scene \"%s\".\n", scene.c_str());
 		printf("- Running MAGSAC with reasonably set maximum threshold (%f px)\n", 3.0);
 		testFundamentalMatrixFitting(ransac_confidence, // The required confidence in the results
 			3, // The maximum sigma value allowed in MAGSAC
@@ -86,7 +89,7 @@ int main(int argc, const char* argv[])
 			drawing_threshold); // The inlier threshold for visualization.
 
 
-		printf("- Running MAGSAC with extreme maximum threshold (%f px)\n", 10.0);
+		printf("\n- Running MAGSAC with extreme maximum threshold (%f px)\n", 10.0);
 		testFundamentalMatrixFitting(ransac_confidence, // The required confidence in the results
 			10, // The maximum sigma value allowed in MAGSAC
 			scene, // The scene type
@@ -106,12 +109,18 @@ std::vector<std::string> getAvailableTestScenes(SceneType scene_type_)
 	switch (scene_type_)
 	{
 	case SceneType::HomographyScene: // Available test scenes for homography estimation
-		return { "LePoint1", "LePoint2", "LePoint3", 
+		return { "LePoint1", "LePoint2", "LePoint3", // "homogr" dataset
 			"graf", "ExtremeZoom", "city", 
 			"CapitalRegion", "BruggeTower", "BruggeSquare", 
 			"BostonLib", "boat", "adam", 
 			"WhiteBoard", "Eiffel", "Brussels", 
-			"Boston"};
+			"Boston",
+			"extremeview/adam", "extremeview/cafe", "extremeview/cat", // "EVD" (i.e. extremeview) dataset
+			"extremeview/dum", "extremeview/face", "extremeview/fox", 
+			"extremeview/girl", "extremeview/graf", "extremeview/grand", 
+			"extremeview/index", "extremeview/mag", "extremeview/pkk", 
+			"extremeview/shop", "extremeview/there", "extremeview/vin", 
+		};
 
 	case SceneType::FundamentalMatrixScene:
 		return {"corr", "booksh", "box",
