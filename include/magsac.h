@@ -288,12 +288,7 @@ void MAGSAC<DatumType, ModelEstimator, Model>::postProcessing(
 	const double divisions_per_process = partition_number / core_number;
 	const double sigma_step = threshold / partition_number;
 
-#ifdef _WIN32 
-	concurrency::parallel_for(0, static_cast<int>(core_number), [&](int process)
-#else
-#pragma omp parallel for schedule (dynamic,1)
 	for (auto process = 0; process < core_number; ++process)
-#endif
 	{
 		const double last_sigma = (process + 1) * divisions_per_process * sigma_step;
 		double prev_sigma = process * divisions_per_process * sigma_step;
