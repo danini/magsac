@@ -52,19 +52,32 @@ public:
 	{
 		static const auto M = sampleSize(); // Size of a minimal sample
 
+		// Normalize the correspondences
+		cv::Mat normalized_points(M, data.cols, data.type()); // The normalized point coordinates
+		cv::Mat normalizing_transformation_src, normalizing_transformation_dst; // The normalizing transformations in the first and second images
+		normalizing_transformation_src = normalizing_transformation_dst = cv::Mat::zeros(3, 3, data.type());
+	
+		if (!normalizePoints(data,
+			sample,
+			M,
+			normalized_points,
+			normalizing_transformation_src,
+			normalizing_transformation_dst))
+			return false;
+
 		// Copying the sample coordinates and building the coefficient matrix
 		static cv::Mat coefficients(8, 8, CV_64F);
 		static cv::Mat inhomogeneous(8, 1, CV_64F);
 		double *A_ptr = reinterpret_cast<double *>(coefficients.data);
 		double *b_ptr = reinterpret_cast<double *>(inhomogeneous.data);
-		const double *data_ptr = reinterpret_cast<double*>(data.data);
+		const double *data_ptr = reinterpret_cast<double*>(normalized_points.data);
 		const size_t offset = data.cols;
 		size_t smpl;
 		double x1, y1, x2, y2;
 
 		for (auto i = 0; i < M; ++i)
 		{
-			smpl = sample[i] * offset;
+			smpl = i * offset;
 			x1 = data_ptr[smpl];
 			y1 = data_ptr[smpl + 1];
 
@@ -95,6 +108,9 @@ public:
 		cv::Mat h = coefficients.inv() * inhomogeneous;
 		h.push_back(1.0);
 		cv::Mat H(3, 3, CV_64F, h.data);
+		H = normalizing_transformation_dst.inv() * 
+			H * 
+			normalizing_transformation_src;
 		Homography model(H); // Initilize the model
 		models->emplace_back(model);
 		return true;

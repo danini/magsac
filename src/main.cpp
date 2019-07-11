@@ -41,14 +41,16 @@ void opencvHomographyFitting(
 	double ransac_confidence_,
 	double threshold_,
 	std::string test_scene_,
-	bool draw_results_ = false);
+	bool draw_results_ = false,
+	const bool with_magsac_post_processing_ = true);
 
 // A method applying OpenCV for fundamental matrix estimation to one of the built-in scenes
 void opencvFundamentalMatrixFitting(
 	double ransac_confidence_,
 	double threshold_,
 	std::string test_scene_,
-	bool draw_results_ = false);
+	bool draw_results_ = false,
+	const bool with_magsac_post_processing_ = true);
 
 // The names of built-in scenes
 std::vector<std::string> getAvailableTestScenes(
@@ -76,7 +78,7 @@ int main(int argc, const char* argv[])
 	const bool draw_results = true; // A flag to draw and show the results 
 	// The inlier threshold for visualization. This threshold is not used by the algorithm,
 	// it is simply for selecting the inliers to be drawn after MAGSAC finished.
-	const double drawing_threshold = 1.0;
+	const double drawing_threshold = 2.0;
 
 	runTest(SceneType::FundamentalMatrixScene, Dataset::kusvod2, ransac_confidence, draw_results, drawing_threshold);
 	runTest(SceneType::FundamentalMatrixScene, Dataset::adelaidermf, ransac_confidence, draw_results, drawing_threshold);
@@ -108,20 +110,31 @@ void runTest(SceneType scene_type_,
 
 		if (scene_type_ == SceneType::HomographyScene)
 		{
-			printf("- Running OpenCV's RANSAC with threshold %f px\n", 3.0);
+			printf("1. Running OpenCV's RANSAC with threshold %f px\n", drawing_threshold_);
 			opencvHomographyFitting(ransac_confidence_,
-				3, // The maximum sigma value allowed in MAGSAC
+				drawing_threshold_, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
-				false); // A flag to draw and show the results
+				false, // A flag to draw and show the results
+				false); // A flag to apply the MAGSAC post-processing to the OpenCV's output
 
-			printf("\n- Running MAGSAC with reasonably set maximum threshold (%f px)\n", 3.0);
+			printf("\n2. Running OpenCV's RANSAC with threshold %f px and\n", drawing_threshold_);
+			printf("applying MAGSAC post-processing to OpenCV's output.\n");
+			printf("This might be beneficial since the post-processing step has.\n");
+			printf("negligible time demand and, usually, improves the result.\n");
+			opencvHomographyFitting(ransac_confidence_,
+				drawing_threshold_, // The maximum sigma value allowed in MAGSAC
+				scene, // The scene type
+				false, // A flag to draw and show the results
+				true); // A flag to apply the MAGSAC post-processing to the OpenCV's output
+
+			printf("\n3. Running MAGSAC with reasonably set maximum threshold (%f px)\n", drawing_threshold_);
 			testHomographyFitting(ransac_confidence_,
-				3, // The maximum sigma value allowed in MAGSAC
+				drawing_threshold_, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
 				draw_results_, // A flag to draw and show the results 
 				drawing_threshold_); // The inlier threshold for visualization.
 
-			printf("\n- Running MAGSAC with extreme maximum threshold (%f px)\n", 10.0);
+			printf("\n4. Running MAGSAC with extreme maximum threshold (%f px)\n", 10.0);
 			testHomographyFitting(ransac_confidence_,
 				10, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
@@ -129,21 +142,32 @@ void runTest(SceneType scene_type_,
 				drawing_threshold_); // The inlier threshold for visualization.
 		} else
 		{
-			printf("- Running OpenCV's RANSAC with threshold %f px\n", 3.0);
+			printf("1. Running OpenCV's RANSAC with threshold %f px\n", drawing_threshold_);
 			opencvFundamentalMatrixFitting(ransac_confidence_,
-				3, // The maximum sigma value allowed in MAGSAC
+				drawing_threshold_, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
-				false); // A flag to draw and show the results
+				false, // A flag to draw and show the results
+				false); // A flag to apply the MAGSAC post-processing to the OpenCV's output
 
-			printf("\n- Running MAGSAC with reasonably set maximum threshold (%f px)\n", 3.0);
+			printf("\n2. Running OpenCV's RANSAC with threshold %f px and\n", drawing_threshold_);
+			printf("applying MAGSAC post-processing to OpenCV's output.\n");
+			printf("This might be beneficial since the post-processing step has.\n");
+			printf("negligible time demand and, usually, improves the result.\n");
+			opencvFundamentalMatrixFitting(ransac_confidence_,
+				drawing_threshold_, // The maximum sigma value allowed in MAGSAC
+				scene, // The scene type
+				false, // A flag to draw and show the results
+				true); // A flag to apply the MAGSAC post-processing to the OpenCV's output
+
+			printf("\n3. Running MAGSAC with reasonably set maximum threshold (%f px)\n", drawing_threshold_);
 			testFundamentalMatrixFitting(ransac_confidence_, // The required confidence in the results
-				3, // The maximum sigma value allowed in MAGSAC
+				drawing_threshold_, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
 				draw_results_, // A flag to draw and show the results 
 				drawing_threshold_); // The inlier threshold for visualization.
 
 
-			printf("\n- Running MAGSAC with extreme maximum threshold (%f px)\n", 10.0);
+			printf("\n4. Running MAGSAC with extreme maximum threshold (%f px)\n", 10.0);
 			testFundamentalMatrixFitting(ransac_confidence_, // The required confidence in the results
 				10, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
@@ -151,7 +175,7 @@ void runTest(SceneType scene_type_,
 				drawing_threshold_); // The inlier threshold for visualization.
 		}
 
-		printf("Press a button to continue.\n\n");
+		printf("\nPress a button to continue.\n\n");
 		cv::waitKey(0);
 	}
 }
@@ -235,7 +259,7 @@ void testFundamentalMatrixFitting(
 	bool draw_results_,
 	double drawing_threshold_)
 {
-	printf("Processed scene = '%s'.\n", test_scene_.c_str());
+	printf("\tProcessed scene = '%s'.\n", test_scene_.c_str());
 
 	// Load the images of the current test scene
 	cv::Mat image1 = cv::imread("data/fundamental_matrix/" + test_scene_ + "A.png");
@@ -286,10 +310,10 @@ void testFundamentalMatrixFitting(
 	std::vector<int> ground_truth_inliers = getSubsetFromLabeling(ground_truth_labels, 1);
 	const size_t I = static_cast<double>(ground_truth_inliers.size());
 
-	printf("Estimated model = '%s'.\n", estimator.modelName().c_str());
-	printf("Number of correspondences loaded = %d.\n", static_cast<int>(N));
-	printf("Number of ground truth inliers = %d.\n", static_cast<int>(I));
-	printf("Theoretical RANSAC iteration number at %.2f confidence = %d.\n",
+	printf("\tEstimated model = '%s'.\n", estimator.modelName().c_str());
+	printf("\tNumber of correspondences loaded = %d.\n", static_cast<int>(N));
+	printf("\tNumber of ground truth inliers = %d.\n", static_cast<int>(I));
+	printf("\tTheoretical RANSAC iteration number at %.2f confidence = %d.\n",
 		ransac_confidence_, static_cast<int>(log(1.0 - ransac_confidence_) / log(1.0 - pow(static_cast<double>(I) / static_cast<double>(N), 4))));
 
 	// Initialize the sampler used for selecting minimal samples
@@ -316,8 +340,8 @@ void testFundamentalMatrixFitting(
 	std::chrono::duration<double> elapsed_seconds = end - start;
 	std::time_t end_time = std::chrono::system_clock::to_time_t(end);
 
-	printf("Actual number of iterations drawn by MAGSAC at %.2f confidence: %d\n", ransac_confidence_, iteration_number);
-	printf("Elapsed time: %f secs\n", elapsed_seconds.count());
+	printf("\tActual number of iterations drawn by MAGSAC at %.2f confidence: %d\n", ransac_confidence_, iteration_number);
+	printf("\tElapsed time: %f secs\n", elapsed_seconds.count());
 
 	// Compute the RMSE given the ground truth inliers
 	double rmse = 0, error;
@@ -327,7 +351,7 @@ void testFundamentalMatrixFitting(
 		rmse += error * error;
 	}
 	rmse = sqrt(rmse / static_cast<double>(I));
-	printf("RMSE error: %f px\n", rmse);
+	printf("\tRMSE error: %f px\n", rmse);
 
 	// Visualization part.
 	// Inliers are selected using threshold and the estimated model. 
@@ -372,7 +396,7 @@ void testHomographyFitting(
 	bool draw_results_,
 	double drawing_threshold_)
 {
-	printf("Processed scene = '%s'.\n", test_scene_.c_str());
+	printf("\tProcessed scene = '%s'.\n", test_scene_.c_str());
 
 	// Load the images of the current test scene
 	cv::Mat image1 = cv::imread("data/homography/" + test_scene_ + "A.png");
@@ -423,10 +447,10 @@ void testHomographyFitting(
 	std::vector<int> ground_truth_inliers = getSubsetFromLabeling(ground_truth_labels, 1);
 	const size_t I = static_cast<double>(ground_truth_inliers.size());
 
-	printf("Estimated model = '%s'.\n", estimator.modelName().c_str());
-	printf("Number of correspondences loaded = %d.\n", static_cast<int>(N));
-	printf("Number of ground truth inliers = %d.\n", static_cast<int>(I));
-	printf("Theoretical RANSAC iteration number at %.2f confidence = %d.\n", 
+	printf("\tEstimated model = '%s'.\n", estimator.modelName().c_str());
+	printf("\tNumber of correspondences loaded = %d.\n", static_cast<int>(N));
+	printf("\tNumber of ground truth inliers = %d.\n", static_cast<int>(I));
+	printf("\tTheoretical RANSAC iteration number at %.2f confidence = %d.\n", 
 		ransac_confidence_, static_cast<int>(log(1.0 - ransac_confidence_) / log(1.0 - pow(static_cast<double>(I) / static_cast<double>(N), 4))));
 
 	// Initialize the sampler used for selecting minimal samples
@@ -453,8 +477,8 @@ void testHomographyFitting(
 	std::chrono::duration<double> elapsed_seconds = end - start;
 	std::time_t end_time = std::chrono::system_clock::to_time_t(end);
 
-	printf("Actual number of iterations drawn by MAGSAC at %.2f confidence: %d\n", ransac_confidence_, iteration_number);
-	printf("Elapsed time: %f secs\n", elapsed_seconds.count());
+	printf("\tActual number of iterations drawn by MAGSAC at %.2f confidence: %d\n", ransac_confidence_, iteration_number);
+	printf("\tElapsed time: %f secs\n", elapsed_seconds.count());
 	 
 	// Compute the RMSE given the ground truth inliers
 	double rmse = 0, error;
@@ -465,7 +489,7 @@ void testHomographyFitting(
 		rmse += error;
 	}
 	rmse = sqrt(rmse / static_cast<double>(I));
-	printf("RMSE error: %f px\n", rmse);
+	printf("\tRMSE error: %f px\n", rmse);
 
 	// Visualization part.
 	// Inliers are selected using threshold and the estimated model. 
@@ -507,9 +531,10 @@ void opencvHomographyFitting(
 	double ransac_confidence_,
 	double threshold_,
 	std::string test_scene_,
-	bool draw_results_)
+	bool draw_results_,
+	const bool with_magsac_post_processing_)
 {
-	printf("Processed scene = '%s'.\n", test_scene_.c_str());
+	printf("\tProcessed scene = '%s'.\n", test_scene_.c_str());
 
 	// Load the images of the current test scene
 	cv::Mat image1 = cv::imread("data/homography/" + test_scene_ + "A.png");
@@ -560,9 +585,9 @@ void opencvHomographyFitting(
 	std::vector<int> ground_truth_inliers = getSubsetFromLabeling(ground_truth_labels, 1);
 	const size_t I = static_cast<double>(ground_truth_inliers.size());
 
-	printf("Estimated model = '%s'.\n", estimator.modelName().c_str());
-	printf("Number of correspondences loaded = %d.\n", static_cast<int>(N));
-	printf("Number of ground truth inliers = %d.\n", static_cast<int>(I));
+	printf("\tEstimated model = '%s'.\n", estimator.modelName().c_str());
+	printf("\tNumber of correspondences loaded = %d.\n", static_cast<int>(N));
+	printf("\tNumber of ground truth inliers = %d.\n", static_cast<int>(I));
 
 	// Define location of sub matrices in data matrix
 	cv::Rect roi1( 0, 0, 3, N );  
@@ -577,11 +602,42 @@ void opencvHomographyFitting(
 		threshold_,
 		obtained_labeling);
 	end = std::chrono::system_clock::now();
-	 
 	std::chrono::duration<double> elapsed_seconds = end - start;
 	std::time_t end_time = std::chrono::system_clock::to_time_t(end);
 
-	printf("Elapsed time: %f secs\n", elapsed_seconds.count());
+	printf("\tElapsed time: %f secs\n", elapsed_seconds.count());
+
+	// Applying the MAGSAC post-processing step using the OpenCV's output
+	// as the input.
+	if (with_magsac_post_processing_)
+	{
+		start = std::chrono::system_clock::now();
+
+		// Initializing MAGSAC
+		MAGSAC<cv::Mat, RobustHomographyEstimator, Homography> magsac;
+		magsac.setSigmaMax(MAX(3, threshold_)); // The maximum noise scale sigma allowed
+		
+		Homography ransac_output, // The model estimated by OpenCV
+			polished_model; // The polished model
+		ransac_output.descriptor = homography;
+		RobustHomographyEstimator estimator; // The fundamental matrix estimator
+		ModelScore polished_model_score; // The score of the polished model
+
+		// Applying the post-processing step to polish the model parameters
+		magsac.postProcessing(points,
+			ransac_output,
+			polished_model,
+			polished_model_score,
+			estimator);
+	
+		homography = polished_model.descriptor;
+		end = std::chrono::system_clock::now();
+	 
+		std::chrono::duration<double> elapsed_seconds = end - start;
+		std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+
+		printf("\tProcessing time of the post-processing step: %f secs\n", elapsed_seconds.count());
+	}
 	 
 	// Compute the RMSE given the ground truth inliers
 	double rmse = 0, error;
@@ -592,7 +648,7 @@ void opencvHomographyFitting(
 		rmse += error;
 	}
 	rmse = sqrt(rmse / static_cast<double>(I));
-	printf("RMSE error: %f px\n", rmse);
+	printf("\tRMSE error: %f px\n", rmse);
 
 	// Visualization part.
 	// Inliers are selected using threshold and the estimated model. 
@@ -621,9 +677,10 @@ void opencvFundamentalMatrixFitting(
 	double ransac_confidence_,
 	double threshold_,
 	std::string test_scene_,
-	bool draw_results_)
+	bool draw_results_,
+	const bool with_magsac_post_processing_)
 {
-	printf("Processed scene = '%s'.\n", test_scene_.c_str());
+	printf("\tProcessed scene = '%s'.\n", test_scene_.c_str());
 
 	// Load the images of the current test scene
 	cv::Mat image1 = cv::imread("data/fundamental_matrix/" + test_scene_ + "A.png");
@@ -674,9 +731,9 @@ void opencvFundamentalMatrixFitting(
 	std::vector<int> ground_truth_inliers = getSubsetFromLabeling(ground_truth_labels, 1);
 	const size_t I = static_cast<double>(ground_truth_inliers.size());
 
-	printf("Estimated model = '%s'.\n", estimator.modelName().c_str());
-	printf("Number of correspondences loaded = %d.\n", static_cast<int>(N));
-	printf("Number of ground truth inliers = %d.\n", static_cast<int>(I));
+	printf("\tEstimated model = '%s'.\n", estimator.modelName().c_str());
+	printf("\tNumber of correspondences loaded = %d.\n", static_cast<int>(N));
+	printf("\tNumber of ground truth inliers = %d.\n", static_cast<int>(I));
 
 	// Define location of sub matrices in data matrix
 	cv::Rect roi1( 0, 0, 3, N );  
@@ -685,18 +742,71 @@ void opencvFundamentalMatrixFitting(
 	std::vector<uchar> obtained_labeling(points.rows, 0);
 	std::chrono::time_point<std::chrono::system_clock> end, 
 		start = std::chrono::system_clock::now();
+
+	// Fundamental matrix estimation using the OpenCV's function
 	cv::Mat fundamental_matrix = cv::findFundamentalMat(cv::Mat(points, roi1), 
 		cv::Mat(points, roi2),
 		CV_FM_RANSAC,
 		threshold_,
 		ransac_confidence_,
-		obtained_labeling);
+		obtained_labeling); 
 	end = std::chrono::system_clock::now();
-	 
 	std::chrono::duration<double> elapsed_seconds = end - start;
 	std::time_t end_time = std::chrono::system_clock::to_time_t(end);
 
-	printf("Elapsed time: %f secs\n", elapsed_seconds.count());
+	printf("\tElapsed time: %f secs\n", elapsed_seconds.count());
+
+	// Applying the MAGSAC post-processing step using the OpenCV's output
+	// as the input.
+	if (with_magsac_post_processing_)
+	{
+		start = std::chrono::system_clock::now();
+
+		// Initializing MAGSAC
+		MAGSAC<cv::Mat, FundamentalMatrixEstimator, FundamentalMatrix> magsac;
+		magsac.setSigmaMax(1.33 * threshold_); // The maximum noise scale sigma allowed
+		
+		FundamentalMatrix ransac_output, // The model estimated by OpenCV
+			polished_model; // The polished model
+		ransac_output.descriptor = fundamental_matrix;
+		FundamentalMatrixEstimator estimator; // The fundamental matrix estimator
+		ModelScore tmp_score;
+		double polished_model_score, // The score of the polished model
+			original_model_score; // The score of the original model
+
+		// Applying the post-processing step to polish the model parameters
+		magsac.postProcessing(points,
+			ransac_output,
+			polished_model,
+			tmp_score,
+			estimator);
+
+		// Get the marginalized score of the RANSAC output and the polished model 
+		// to decide which one to use.
+		double tmp_inlier_ratio;
+		magsac.getSigmaScore(
+			points,
+			ransac_output,
+			estimator,
+			tmp_inlier_ratio, 
+			polished_model_score);
+
+		magsac.getSigmaScore(
+			points,
+			polished_model,
+			estimator,
+			tmp_inlier_ratio, 
+			original_model_score);
+	
+		if (polished_model_score < original_model_score)
+			fundamental_matrix = polished_model.descriptor;
+		end = std::chrono::system_clock::now();
+	 
+		std::chrono::duration<double> elapsed_seconds = end - start;
+		std::time_t end_time = std::chrono::system_clock::to_time_t(end);
+
+		printf("\tProcessing time of the post-processing step: %f secs\n", elapsed_seconds.count());
+	}
 	 
 	// Compute the RMSE given the ground truth inliers
 	double rmse = 0, error;
@@ -707,7 +817,7 @@ void opencvFundamentalMatrixFitting(
 		rmse += error;
 	}
 	rmse = sqrt(rmse / static_cast<double>(I));
-	printf("RMSE error: %f px\n", rmse);
+	printf("\tRMSE error: %f px\n", rmse);
 
 	// Visualization part.
 	// Inliers are selected using threshold and the estimated model. 

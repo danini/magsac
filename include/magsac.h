@@ -85,6 +85,20 @@ public:
 
 	void setFPS(int fps_) { desired_fps = fps_; time_limit = fps_ <= 0 ? std::numeric_limits<double>::max() : 1.0 / fps_; }
 
+	void postProcessing(
+		const cv::Mat &points,
+		const Model &so_far_the_best_model,
+		Model &output_model,
+		ModelScore &output_score,
+		const ModelEstimator &estimator);
+
+	void getSigmaScore(
+		const cv::Mat& points_,
+		Model& model_,
+		const ModelEstimator& estimator_,
+		double& avg_inlier_ratio_,
+		double& score_);
+
 protected:
 	size_t iteration_limit; // Maximum number of iterations allowed
 	size_t mininum_iteration_number; // Minimum number of iteration before terminating
@@ -99,20 +113,6 @@ protected:
 	double log_confidence; // The logarithm of the required confidence
 	size_t partition_number; // Number of partitions used to speed up sigma-consensus
 	double interrupting_threshold; // A threshold to speed up MAGSAC by interrupting the sigma-consensus procedure whenever there is no chance of being better than the previous so-far-the-best model
-
-	void getSigmaScore(
-		const cv::Mat& points_,
-		Model& model_,
-		const ModelEstimator& estimator_,
-		double& avg_inlier_ratio_,
-		double& score_);
-
-	void postProcessing(
-		const cv::Mat &points,
-		const Model &so_far_the_best_model,
-		Model &output_model,
-		ModelScore &output_score,
-		const ModelEstimator &estimator);
 
 	void sigmaConsensus(
 		const cv::Mat& points_,
