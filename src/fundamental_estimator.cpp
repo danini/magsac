@@ -4,7 +4,6 @@
 #include <random>
 #include <vector>
 #include <cv.h>
-#include <Eigen/Dense>
 
 #include "estimator.h"
 
