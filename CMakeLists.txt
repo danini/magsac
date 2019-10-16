@@ -18,6 +18,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 find_package(OpenCV 3.0.0 REQUIRED)
 
 # ==============================================================================
+# Find Eigen
+# ==============================================================================
+find_package(Eigen3 REQUIRED)
+set(EIGEN_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
+
+# ==============================================================================
 # Find OpenMP
 # ==============================================================================
 find_package(OpenMP)
@@ -34,10 +40,33 @@ endif (USE_OPENMP)
 # ==============================================================================
 include_directories (
 	${PROJECT_SOURCE_DIR}/include
+	${PROJECT_SOURCE_DIR}/graph-cut-ransac/include
 )
 
 # ==============================================================================
-# Structure: Library
+# Structure: Graph-Cut RANSAC Library
+# ==============================================================================
+# Set header files for the library
+file(GLOB_RECURSE HDRS_GraphCutRANSAC
+	"graph-cut-ransac/include/*.h"
+) 
+
+# Set source files to be added to the library
+file(GLOB_RECURSE SRCS_GraphCutRANSAC 
+	"graph-cut-ransac/include/*.cpp"
+)
+
+add_library(GraphCutRANSAC STATIC
+	${HDRS_GraphCutRANSAC}
+	${SRCS_GraphCutRANSAC}
+)
+
+target_link_libraries(GraphCutRANSAC
+	${OpenCV_LIBS}
+	Eigen3::Eigen)
+
+# ==============================================================================
+# Structure: MAGSAC Library
 # ==============================================================================
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
@@ -59,10 +88,24 @@ add_executable(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME} 
 	${OpenCV_LIBS}
+	Eigen3::Eigen
 )
-
+	
 # ==============================================================================
 # Structure: Applications
 # ==============================================================================
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+if (CREATE_SAMPLE_PROJECT)
+	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+
+	add_executable(SampleProject
+		src/main.cpp)
+		
+	target_link_libraries(SampleProject 
+		${PROJECT_NAME}
+		${OpenCV_LIBS}
+		Eigen3::Eigen
+	)
+
+	add_dependencies(SampleProject ${PROJECT_NAME})
+endif (CREATE_SAMPLE_PROJECT)
 

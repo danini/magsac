@@ -6,6 +6,8 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
 
+#include "estimator.h"
+
 #include <vector>
 #include <fstream>
 
@@ -40,7 +42,7 @@ bool loadPointsFromFile(
 	std::vector<cv::Point2d>& dst_points_);
 
 bool loadProjectionMatrix(
-	cv::Mat& P, 
+	cv::Mat& probability, 
 	std::string file);
 
 void showImage(const cv::Mat& image_,
@@ -53,7 +55,7 @@ template <typename Model, typename Estimator>
 void refineManualLabeling(
 	const cv::Mat& points_,
 	std::vector<int>& labeling_,
-	const Estimator estimator_,
+	const Estimator &estimator_,
 	const double threshold_);
 
 /**************************************************
@@ -63,23 +65,28 @@ template <typename Model, typename Estimator>
 void refineManualLabeling(
 	const cv::Mat& points_, // All data points
 	std::vector<int>& labeling_, // The labeling to be refined
-	const Estimator estimator_, // The estimator object which has an error(...) function to calculate the residual of each point
+	const Estimator &estimator_, // The estimator object which has an error(...) function to calculate the residual of each point
 	const double threshold_) // The inlier-outlier threshold
 {
 	// Collect the points labeled as inliers
-	std::vector<int> inliers;
-	const size_t N = labeling_.size();
-	inliers.reserve(N);
-	for (auto i = 0; i < N; ++i)
+	std::vector<size_t> inliers; // The container for the inliers
+	const size_t point_number = labeling_.size(); // The number of points
+	inliers.reserve(point_number);
+
+	// Iterating through all points. If a point is labeling inliers, store it.
+	for (size_t i = 0; i < point_number; ++i)
 		if (labeling_[i])
 			inliers.emplace_back(i);
 
+	// Number of inliers
+	const size_t inlier_number = inliers.size();
+
 	// Estimate a model from the manually selected inliers
-	std::vector<Model> models;
-	estimator_.estimateModelNonminimal(points_,
-		&(inliers[0]),
-		inliers.size(),
-		&models);
+	std::vector<gcransac::Model> models;
+	estimator_.estimateModelNonminimal(points_, // All data points
+		&(inliers[0]), // The inlier indices
+		inlier_number, // The number of inliers
+		&models); // The estimated models
 
 	if (models.size() != 1)
 	{
@@ -87,9 +94,12 @@ void refineManualLabeling(
 		return;
 	}
 
-	// Select the inliers of the estimated model
-	for (auto i = 0; i < N; ++i)
-		labeling_[i] = estimator_.error(points_.row(i), models[0]) < threshold_;
+	// The squared threshold used to select the new inliers
+	const double squared_threshold = threshold_ * threshold_;
+
+	// Select the new inliers of the estimated model
+	for (size_t i = 0; i < point_number; ++i)
+		labeling_[i] = estimator_.squaredResidual(points_.row(i), models[0]) < squared_threshold;
 }
 
 template <typename LabelType>
@@ -177,7 +187,7 @@ bool savePointsToFile(
 
 void readAnnotatedPoints(
 	const std::string& path_,
-	cv::Mat& points_, 
+	cv::Mat& points_,
 	std::vector<int>& labels_)
 {
 	std::ifstream file(path_);
@@ -208,15 +218,60 @@ void readAnnotatedPoints(
 
 	file.close();
 
-	points_.create(static_cast<int>(pts1.size()), 6, CV_64F);
+	points_.create(static_cast<int>(pts1.size()), 4, CV_64F);
 	for (int i = 0; i < pts1.size(); ++i)
 	{
 		points_.at<double>(i, 0) = pts1[i].x;
 		points_.at<double>(i, 1) = pts1[i].y;
-		points_.at<double>(i, 2) = 1;
-		points_.at<double>(i, 3) = pts2[i].x;
-		points_.at<double>(i, 4) = pts2[i].y;
-		points_.at<double>(i, 5) = 1;
+		points_.at<double>(i, 2) = pts2[i].x;
+		points_.at<double>(i, 3) = pts2[i].y;
+	}
+}
+
+template<size_t _ColumnNumber>
+void readPoints(
+	const std::string& path_,
+	cv::Mat& points_)
+{
+	std::ifstream file(path_);
+
+	constexpr size_t dimension_number = _ColumnNumber / 2;
+	double x1, y1, x2, y2, a, s;
+	std::string str;
+
+	std::vector<cv::Point2d> pts1;
+	std::vector<cv::Point2d> pts2;
+
+	size_t point_number = 0;
+	file >> point_number;
+
+	for (size_t i = 0; i < point_number; ++i)
+	{
+		for (size_t dim = 0; dim < dimension_number; ++dim)
+			if (dim == 0)
+				file >> x1;
+			else if (dim == 1)
+				file >> y1;
+
+		for (size_t dim = 0; dim < dimension_number; ++dim)
+			if (dim == 0)
+				file >> x2;
+			else if (dim == 1)
+				file >> y2;
+
+		pts1.emplace_back(cv::Point2d(x1, y1));
+		pts2.emplace_back(cv::Point2d(x2, y2));
+	}
+	
+	file.close();
+
+	points_.create(static_cast<int>(pts1.size()), 4, CV_64F);
+	for (int i = 0; i < pts1.size(); ++i)
+	{
+		points_.at<double>(i, 0) = pts1[i].x;
+		points_.at<double>(i, 1) = pts1[i].y;
+		points_.at<double>(i, 2) = pts2[i].x;
+		points_.at<double>(i, 3) = pts2[i].y;
 	}
 }
 
@@ -244,8 +299,8 @@ void drawMatches(
 
 		const T x1 = points_.at<T>(pt_idx, 0);
 		const T y1 = points_.at<T>(pt_idx, 1);
-		const T x2 = points_.at<T>(pt_idx, 3);
-		const T y2 = points_.at<T>(pt_idx, 4);
+		const T x2 = points_.at<T>(pt_idx, 2);
+		const T y2 = points_.at<T>(pt_idx, 3);
 		const size_t n = keypoints1.size();
 
 		keypoints1.emplace_back(
