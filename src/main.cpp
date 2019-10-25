@@ -4,7 +4,8 @@
 #include <ctime>
 #include <chrono>
 #include <cstddef>
-
+#include <mutex>
+#include <memory>
 //#include <cv.h>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
