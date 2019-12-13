@@ -28,6 +28,11 @@ namespace magsac
 				return std::sqrt(squaredSymmetricEpipolarDistance(point_, model_.descriptor));
 			}
 
+			static constexpr double getSigmaQuantile()
+			{
+				return 3.64;
+			}
+
 			static constexpr size_t getDegreesOfFreedom()
 			{
 				return 4;
@@ -36,6 +41,23 @@ namespace magsac
 			static constexpr double getGammaFunction()
 			{
 				return 1.0;
+			}
+
+			static constexpr double getC()
+			{
+				return 0.25;
+			}
+
+			// Calculating the upper incomplete gamma value of (DoF - 1) / 2 with k^2 / 2.
+			static constexpr double getUpperIncompleteGammaOfK()
+			{
+				return 0.0036572608340910764;
+			}
+
+			// Calculating the lower incomplete gamma value of (DoF + 1) / 2 with k^2 / 2.
+			static constexpr double getLowerIncompleteGammaOfK()
+			{
+				return 1.3012265540498875;
 			}
 
 			static constexpr double getChiSquareParamCp()
@@ -70,15 +92,37 @@ namespace magsac
 			{
 				return squaredSymmetricEpipolarDistance(point_, model_.descriptor);
 			}
+
+			static constexpr double getSigmaQuantile()
+			{
+				return 3.64;
+			}
 			
 			static constexpr size_t getDegreesOfFreedom()
 			{
 				return 4;
 			}
 
+			static constexpr double getC()
+			{
+				return 0.25;
+			}
+
 			static constexpr double getGammaFunction()
 			{
 				return 1.0;
+			}
+
+			// Calculating the upper incomplete gamma value of (DoF - 1) / 2 with k^2 / 2.
+			static constexpr double getUpperIncompleteGammaOfK()
+			{
+				return 0.0036572608340910764;
+			}
+
+			// Calculating the lower incomplete gamma value of (DoF + 1) / 2 with k^2 / 2.
+			static constexpr double getLowerIncompleteGammaOfK()
+			{
+				return 1.3012265540498875;
 			}
 
 			static constexpr double getChiSquareParamCp()
@@ -107,14 +151,36 @@ namespace magsac
 				return residual(point_, model_.descriptor);
 			}
 			
+			static constexpr double getSigmaQuantile()
+			{
+				return 3.64;
+			}
+
 			static constexpr size_t getDegreesOfFreedom()
 			{
 				return 4;
 			}
 
+			static constexpr double getC()
+			{
+				return 0.25;
+			}
+
+			// Calculating the upper incomplete gamma value of (DoF - 1) / 2 with k^2 / 2.
 			static constexpr double getGammaFunction()
 			{
 				return 1.0;
+			}
+
+			static constexpr double getUpperIncompleteGammaOfK()
+			{
+				return 0.0036572608340910764;
+			}
+
+			// Calculating the lower incomplete gamma value of (DoF + 1) / 2 with k^2 / 2.
+			static constexpr double getLowerIncompleteGammaOfK()
+			{
+				return 1.3012265540498875;
 			}
 
 			static constexpr double getChiSquareParamCp()

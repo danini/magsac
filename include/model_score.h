@@ -16,6 +16,11 @@ public:
 	size_t iteration;
 
 	ModelScore() : inlier_number(0), score(0), probability(0), iteration(0) { }
+
+	inline bool operator<(const ModelScore& score_)
+	{
+		return score < score_.score;
+	}
 };
 
 using Score = ModelScore;

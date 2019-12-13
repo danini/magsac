@@ -15,8 +15,10 @@
 #include "magsac_utils.h"
 #include "utils.h"
 #include "magsac.h"
+#include "gcransac.h"
 
 #include "uniform_sampler.h"
+#include "flann_neighborhood_graph.h"
 #include "fundamental_estimator.h"
 #include "homography_estimator.h"
 #include "types.h"
@@ -93,10 +95,14 @@ std::string dataset2str(Dataset dataset_);
 
 int main(int argc, const char* argv[])
 {
+	const std::string scenes[] = {"TUM", "KITTI","Tanks_and_Temples", "CPC" };
+	
 	/*
-		This is an example showing how MAGSAC is applied to homography or fundamental matrix estimation tasks.
-		The paper is readable here: https://arxiv.org/pdf/1803.07469.pdf
+		This is an example showing how MAGSAC or MAGSAC++ is applied to homography or fundamental matrix estimation tasks.
 		This implementation is not the one used in the experiments of the paper.
+		If you use this method, please cite:
+		(1) Barath, Daniel, Jana Noskova, and Jiri Matas. "MAGSAC: marginalizing sample consensus.", Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition. 2019.
+		(2) Barath, Daniel, Jana Noskova, Maksym Ivashechkin, and Jiri Matas. "MAGSAC++, a fast, reliable and accurate robust estimator", Arxiv preprint:1912.05909. 2019.
 	*/
 	const double ransac_confidence = 0.99; // The required confidence in the results
 	const bool draw_results = true; // A flag to draw and show the results 
@@ -162,22 +168,14 @@ void runTest(SceneType scene_type_, // The type of the fitting problem
 				scene, // The scene type
 				false, // A flag to draw and show the results
 				false); // A flag to apply the MAGSAC post-processing to the OpenCV's output
-
-			// Apply MAGSAC with a reasonably set maximum threshold
-			printf("\n2. Running MAGSAC with reasonably set maximum threshold (%f px)\n", drawing_threshold_);
-			testHomographyFitting(ransac_confidence_, // The required confidence in the results
-				drawing_threshold_, // The maximum sigma value allowed in MAGSAC
+			
+			// Apply MAGSAC with maximum threshold set to a fairly high value
+			printf("\n2. Running MAGSAC with fairly high maximum threshold (%f px)\n", 50.0);
+			testHomographyFitting(ransac_confidence_,
+				50.0, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
-				draw_results_, // A flag to draw and show the results 
-				drawing_threshold_); // The inlier threshold for visualization.
-								
-			// Apply MAGSAC with a reasonably set maximum threshold
-			printf("\n3. Running MAGSAC with extreme set maximum threshold (%f px)\n", 35.0);
-			testHomographyFitting(ransac_confidence_, 
-				35.0, // The maximum sigma value allowed in MAGSAC
-				scene, // The scene type
-				draw_results_, // A flag to draw and show the results 
-				drawing_threshold_); // The inlier threshold for visualization.
+				true, // A flag to draw and show the results  
+				2.5); // The inlier threshold for visualization.
 		} else if (scene_type_ == SceneType::FundamentalMatrixScene)
 		{
 			// Apply the homography estimation method built into OpenCV
@@ -187,19 +185,11 @@ void runTest(SceneType scene_type_, // The type of the fitting problem
 				scene, // The scene type
 				false, // A flag to draw and show the results
 				false); // A flag to apply the MAGSAC post-processing to the OpenCV's output
-
-			// Apply MAGSAC with a reasonably set maximum threshold
-			printf("\n2. Running MAGSAC with reasonably set maximum threshold (%f px)\n", drawing_threshold_);
-			testFundamentalMatrixFitting(ransac_confidence_, // The required confidence in the results
-				drawing_threshold_, // The maximum sigma value allowed in MAGSAC
-				scene, // The scene type
-				draw_results_, // A flag to draw and show the results 
-				drawing_threshold_); // The inlier threshold for visualization.
 			
-			// Apply MAGSAC with an extreme maximum threshold
-			printf("\n3. Running MAGSAC with extreme maximum threshold (%f px)\n", 17.0);
+			// Apply MAGSAC with fairly high maximum threshold
+			printf("\n2. Running MAGSAC with fairly high maximum threshold (%f px)\n", 5.0);
 			testFundamentalMatrixFitting(ransac_confidence_, // The required confidence in the results
-				17.0, // The maximum sigma value allowed in MAGSAC
+				5.0, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
 				draw_results_, // A flag to draw and show the results 
 				drawing_threshold_); // The inlier threshold for visualization.
@@ -215,20 +205,12 @@ void runTest(SceneType scene_type_, // The type of the fitting problem
 				false); // A flag to apply the MAGSAC post-processing to the OpenCV's output
 
 			// Apply MAGSAC with a reasonably set maximum threshold
-			printf("\n2. Running MAGSAC with reasonably set maximum threshold (%f%% of the image)\n", drawing_threshold_);
+			printf("\n2. Running MAGSAC with reasonably set maximum threshold (%f px)\n", drawing_threshold_);
 			testEssentialMatrixFitting(ransac_confidence_, // The required confidence in the results
-				3.0, // The maximum sigma value allowed in MAGSAC
+				5.0, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
 				true, // A flag to draw and show the results 
-				3.00); // The inlier threshold for visualization.
-
-			// Apply MAGSAC with an extreme maximum threshold
-			printf("\n3. Running MAGSAC with extreme maximum threshold (%f%% of the image)\n", 0.5);
-			testEssentialMatrixFitting(ransac_confidence_, // The required confidence in the results
-				10.0, // The maximum sigma value allowed in MAGSAC
-				scene, // The scene type
-				true, // A flag to draw and show the results 
-				3.00); // The inlier threshold for visualization.
+				drawing_threshold_); // The inlier threshold for visualization.
 		}
 
 		printf("\nPress a button to continue.\n\n");
@@ -409,8 +391,6 @@ void testEssentialMatrixFitting(
 
 	MAGSAC<cv::Mat, magsac::utils::DefaultEssentialMatrixEstimator> magsac;
 	magsac.setMaximumThreshold(normalized_maximum_threshold); // The maximum noise scale sigma allowed
-	magsac.setCoreNumber(5); // The number of cores used to speed up sigma-consensus
-	magsac.setPartitionNumber(5); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
 	magsac.setIterationLimit(1e4); // Iteration limit to interrupt the cases when the algorithm run too long.
 
 	int iteration_number = 0; // Number of iterations required
@@ -430,9 +410,7 @@ void testEssentialMatrixFitting(
 
 	printf("\tActual number of iterations drawn by MAGSAC at %.2f confidence: %d\n", ransac_confidence_, iteration_number);
 	printf("\tElapsed time: %f secs\n", elapsed_seconds.count());
-
-	// Compute the RMSE given the ground truth inliers
-
+	
 	// Visualization part.
 	// Inliers are selected using threshold and the estimated model. 
 	// This part is not necessary and is only for visualization purposes. 
@@ -453,14 +431,7 @@ void testEssentialMatrixFitting(
 		}
 	}
 
-	std::mutex mm;
-	mm.lock();
-	std::ofstream ff("e_tuning.csv", std::fstream::app);
-	ff << maximum_threshold_ << ";" << inlier_number << std::endl;
-	ff.close();
-	mm.unlock();
-
-	printf("\tNumber of points closer than %f = %d\n", 
+	printf("\tNumber of points closer than %f is %d\n", 
 		drawing_threshold_, inlier_number);
 
 	if (draw_results_)
@@ -556,8 +527,6 @@ void testFundamentalMatrixFitting(
 	
 	MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator> magsac;
 	magsac.setMaximumThreshold(maximum_threshold_); // The maximum noise scale sigma allowed
-	magsac.setCoreNumber(5); // The number of cores used to speed up sigma-consensus
-	magsac.setPartitionNumber(5); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
 	magsac.setIterationLimit(1e4); // Iteration limit to interrupt the cases when the algorithm run too long.
 
 	int iteration_number = 0; // Number of iterations required
@@ -702,9 +671,8 @@ void testHomographyFitting(
 
 	MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator> magsac;
 	magsac.setMaximumThreshold(maximum_threshold_); // The maximum noise scale sigma allowed
-	magsac.setCoreNumber(5); // The number of cores used to speed up sigma-consensus
-	magsac.setPartitionNumber(5); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
 	magsac.setIterationLimit(1e4); // Iteration limit to interrupt the cases when the algorithm run too long.
+	magsac.setReferenceThreshold(2.0);
 
 	int iteration_number = 0; // Number of iterations required
 
@@ -718,12 +686,12 @@ void testHomographyFitting(
 		iteration_number); // The number of iterations
 	end = std::chrono::system_clock::now();
 	 
-	std::chrono::duration<double> elapsed_seconds = end - start;
+	std::chrono::duration<double> elapsed_seconds = end - start; 
 	std::time_t end_time = std::chrono::system_clock::to_time_t(end);
 
 	printf("\tActual number of iterations drawn by MAGSAC at %.2f confidence: %d\n", ransac_confidence_, iteration_number);
 	printf("\tElapsed time: %f secs\n", elapsed_seconds.count());
-
+	
 	// Compute the root mean square error (RMSE) using the ground truth inliers
 	double rmse = 0; // The RMSE error
 	// Iterate through all inliers and calculate the error
@@ -731,7 +699,7 @@ void testHomographyFitting(
 		rmse += estimator.squaredResidual(points.row(inlier_idx), model);
 	rmse = sqrt(rmse / static_cast<double>(reference_inlier_number));
 	printf("\tRMSE error: %f px\n", rmse);
-
+	
 	// Visualization part.
 	// Inliers are selected using threshold and the estimated model. 
 	// This part is not necessary and is only for visualization purposes. 
@@ -752,7 +720,7 @@ void testHomographyFitting(
 		}
 
 		cv::Mat out_image;
-
+		
 		// Draw the matches to the images
 		drawMatches<double, int>(points, // All points 
 			obtained_labeling, // The labeling obtained by OpenCV
@@ -767,6 +735,8 @@ void testHomographyFitting(
 			1600, // The width of the window
 			900); // The height of the window
 		out_image.release(); // Clean up the memory
+
+		cv::imwrite("evd_" + test_scene_ + ".jpg", out_image);
 	}
 
 	// Clean up the memory occupied by the images
@@ -860,7 +830,7 @@ void opencvHomographyFitting(
 	// Estimating the homography matrix by OpenCV's RANSAC
 	cv::Mat cv_homography = cv::findHomography(cv::Mat(points, roi1), // The points in the first image
 		cv::Mat(points, roi2), // The points in the second image
-		CV_RANSAC, // The method used for the fitting
+		CV_LMEDS, // The method used for the fitting
 		threshold_, // The inlier-outlier threshold
 		obtained_labeling); // The obtained labeling
 	
@@ -1028,59 +998,8 @@ void opencvFundamentalMatrixFitting(
 	// Applying the MAGSAC post-processing step using the OpenCV's output
 	// as the input.
 	if (with_magsac_post_processing_)
-	{
-		start = std::chrono::system_clock::now();
-
-		// Initializing MAGSAC
-		MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator> magsac;
-		magsac.setMaximumThreshold(5.0); // The maximum noise scale sigma allowed
-		
-		gcransac::FundamentalMatrix ransac_output, // The model estimated by OpenCV
-			polished_model; // The polished model
-		ransac_output.descriptor = fundamental_matrix;
-		magsac::utils::DefaultFundamentalMatrixEstimator estimator; // The fundamental matrix estimator
-		ModelScore tmp_score;
-		double polished_model_score, // The score of the polished model
-			original_model_score; // The score of the original model
-
-		// Applying the post-processing step to polish the model parameters
-		bool success = magsac.postProcessing(points,
-			ransac_output,
-			polished_model,
-			tmp_score,
-			estimator);
-
-		// Get the marginalized score of the RANSAC output and the polished model 
-		// to decide which one to use.
-		if (success)
-		{
-			double tmp_inlier_ratio;
-			magsac.getSigmaScore(
-				points,
-				ransac_output,
-				estimator,
-				tmp_inlier_ratio,
-				polished_model_score);
-
-			std::cout << polished_model.descriptor << std::endl;
-			std::cout << ransac_output.descriptor << std::endl;
-
-			magsac.getSigmaScore(
-				points,
-				polished_model,
-				estimator,
-				tmp_inlier_ratio,
-				original_model_score);
-
-			if (polished_model_score < original_model_score)
-				fundamental_matrix = polished_model.descriptor;
-		}
-		end = std::chrono::system_clock::now();
-	 
-		std::chrono::duration<double> elapsed_seconds = end - start;
-		std::time_t end_time = std::chrono::system_clock::to_time_t(end);
-		
-		printf("\tProcessing time of the post-processing step: %f secs\n", elapsed_seconds.count());
+	{		
+		fprintf(stderr, "\tPost-processing is not implemented yet.\n");
 	}
 	 
 	// Compute the RMSE given the ground truth inliers
