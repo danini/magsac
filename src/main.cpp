@@ -15,7 +15,6 @@
 #include "magsac_utils.h"
 #include "utils.h"
 #include "magsac.h"
-#include "gcransac.h"
 
 #include "uniform_sampler.h"
 #include "flann_neighborhood_graph.h"
@@ -24,8 +23,6 @@
 #include "types.h"
 #include "model.h"
 #include "estimators.h"
-
-#include <iostream>
 
 enum SceneType { FundamentalMatrixScene, HomographyScene, EssentialMatrixScene };
 enum Dataset { kusvod2, extremeview, homogr, adelaidermf, multih, strecha };
