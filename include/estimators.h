@@ -3,7 +3,7 @@
 #include "essential_estimator.h"
 #include "fundamental_estimator.h"
 #include "homography_estimator.h"
-
+#include "model.h"
 namespace magsac
 {
 	namespace estimator
@@ -23,7 +23,7 @@ namespace magsac
 			// Since symmetric epipolar distance is usually more robust than Sampson-error.
 			// we are using it for the score calculation.
 			inline double residualForScoring(const cv::Mat& point_,
-				const Model& model_) const
+                const gcransac::Model& model_) const
 			{
 				return std::sqrt(squaredSymmetricEpipolarDistance(point_, model_.descriptor));
 			}
@@ -88,7 +88,7 @@ namespace magsac
 			// Since symmetric epipolar distance is usually more robust than Sampson-error.
 			// we are using it for the score calculation.
 			inline double residualForScoring(const cv::Mat& point_,
-				const Model& model_) const
+                const gcransac::Model& model_) const
 			{
 				return squaredSymmetricEpipolarDistance(point_, model_.descriptor);
 			}
@@ -146,7 +146,7 @@ namespace magsac
 			// Since symmetric epipolar distance is usually more robust than Sampson-error.
 			// we are using it for the score calculation.
 			inline double residualForScoring(const cv::Mat& point_,
-				const Model& model_) const
+                const gcransac::Model& model_) const
 			{
 				return residual(point_, model_.descriptor);
 			}

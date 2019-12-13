@@ -4,8 +4,8 @@
 #include <ctime>
 #include <chrono>
 #include <cstddef>
-
-#include <cv.h>
+#include <mutex>
+#include <memory>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
@@ -830,7 +830,7 @@ void opencvHomographyFitting(
 	// Estimating the homography matrix by OpenCV's RANSAC
 	cv::Mat cv_homography = cv::findHomography(cv::Mat(points, roi1), // The points in the first image
 		cv::Mat(points, roi2), // The points in the second image
-		CV_LMEDS, // The method used for the fitting
+        cv::RANSAC, // The method used for the fitting
 		threshold_, // The inlier-outlier threshold
 		obtained_labeling); // The obtained labeling
 	
@@ -981,7 +981,7 @@ void opencvFundamentalMatrixFitting(
 	// Fundamental matrix estimation using the OpenCV's function
 	cv::Mat cv_fundamental_matrix = cv::findFundamentalMat(cv::Mat(points, roi1), // The points in the source image
 		cv::Mat(points, roi2), // The points in the destination image
-		CV_FM_RANSAC,
+        cv::RANSAC,
 		threshold_,
 		ransac_confidence_,
 		obtained_labeling); 
@@ -1122,7 +1122,7 @@ void opencvEssentialMatrixFitting(
 	cv::Mat cv_essential_matrix = cv::findEssentialMat(cv::Mat(normalized_points, roi1), // The points in the first image
 		cv::Mat(normalized_points, roi2), // The points in the second image
 		cv_intrinsics_source, // The intrinsic camera matrix of the source image
-		CV_RANSAC, // The method used for the fitting
+        cv::RANSAC, // The method used for the fitting
 		ransac_confidence_, // The RANSAC confidence
 		threshold_, // The inlier-outlier threshold
 		obtained_labeling); // The obtained labeling

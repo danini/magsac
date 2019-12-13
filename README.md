@@ -40,3 +40,7 @@ Next to the executable, copy the `data` folder and, also, create a `results` fol
 - CMake 2.8.12 or higher
 - OpenCV 3.0 or higher
 - A modern compiler with C++17 support
+
+# Python wrapper
+
+The Python wrapper for MAGSAC can be found at https://github.com/ducha-aiki/pymagsac thanks to Dmytro Mishkin.
