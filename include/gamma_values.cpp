@@ -1,6 +1,6 @@
 
-constexpr size_t stored_gamma_number = 36000;
-constexpr size_t stored_incomplete_gamma_number = 100000;
+constexpr unsigned int stored_gamma_number = 36000;
+constexpr unsigned int stored_incomplete_gamma_number = 100000;
 constexpr double precision_of_stored_gammas = 1e4;
 constexpr double precision_of_stored_incomplete_gammas = 1e4;
 
