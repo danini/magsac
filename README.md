@@ -1,19 +1,28 @@
 # The MAGSAC algorithm for robust model fitting without using an inlier-outlier threshold
 
-The MAGSAC algorithm proposed in paper: Daniel Barath, Jana Noskova and Jiri Matas; MAGSAC: Marginalizing sample consensus, Conference on Computer Vision and Pattern Recognition, 2019. 
-It is available at https://arxiv.org/pdf/1803.07469.pdf
+The MAGSAC and MAGSAC++ algorithms proposed for robust model estimation without a single inlier-outlier threshold.
 
 Made in OpenCV 3.46.
-
 To run the executable with the examples, copy the "data" folder next to the executable or set the path in the main() function.
 
 
-# The MAGSAC algorithm for robust model fitting without using an inlier-outlier threshold
+If you use the algorithm, please cite
 
-The MAGSAC algorithm proposed in paper: Daniel Barath, Jana Noskova and Jiri Matas; MAGSAC: marginalizing sample consensus, Conference on Computer Vision and Pattern Recognition, 2019. 
-It is available at http://openaccess.thecvf.com/content_CVPR_2019/papers/Barath_MAGSAC_Marginalizing_Sample_Consensus_CVPR_2019_paper.pdf
+```
+@inproceedings{barath2019magsac,
+	author = {Barath, Daniel and Matas, Jiri and Noskova, Jana},
+	title = {MAGSAC: marginalizing sample consensus},
+	booktitle = {Conference on Computer Vision and Pattern Recognition},
+	year = {2019},
+}
 
-When using the algorithm, please cite `Barath, Daniel, and Noskova, Jana and Matas, Jiří. "MAGSAC: marginalizing sample consensus" Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition. 2019`.
+@inproceedings{barath2019magsacplusplus,
+	author = {Barath, Daniel and Noskova, Jana and Ivashechkin, Maksym and Matas, Jiri},
+	title = {MAGSAC++, a fast, reliable and accurate robust estimator},
+	booktitle = {arXiv preprint:1912.05909},
+	year = {2019},
+}
+```
 
 # Installation
 
