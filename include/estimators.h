@@ -16,7 +16,8 @@ namespace magsac
 		{
 		public:
 			FundamentalMatrixEstimator(const double minimum_inlier_ratio_in_validity_check_ = 0.5) :
-				gcransac::estimator::FundamentalMatrixEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>(minimum_inlier_ratio_in_validity_check_)
+				gcransac::estimator::FundamentalMatrixEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>(minimum_inlier_ratio_in_validity_check_,
+					false) // Turn off DEGENSAC since it is not adapted yet to be applicable inside MAGSAC
 			{}
 
 			// Calculating the residual which is used for the MAGSAC score calculation.

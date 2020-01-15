@@ -41,10 +41,6 @@ bool loadPointsFromFile(
 	std::vector<cv::Point2d>& src_points_, 
 	std::vector<cv::Point2d>& dst_points_);
 
-bool loadProjectionMatrix(
-	cv::Mat& probability, 
-	std::string file);
-
 void showImage(const cv::Mat& image_,
 	std::string window_name_,
 	int max_width_ = std::numeric_limits<int>::max(),
@@ -147,21 +143,6 @@ bool loadPointsFromFile(
 		dst_points_.emplace_back(cv::Point2d(x2, y2));
 	}
 
-	infile.close();
-	return true;
-}
-
-bool loadProjectionMatrix(
-	const std::string& path_,
-	cv::Mat& matrix_)
-{
-	std::ifstream infile(path_);
-
-	if (!infile.is_open())
-		return false;
-
-	double* P_ptr = (double*)matrix_.data;
-	while (infile >> *(P_ptr++));
 	infile.close();
 	return true;
 }

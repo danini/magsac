@@ -688,7 +688,15 @@ void testHomographyFitting(
 
 	printf("\tActual number of iterations drawn by MAGSAC at %.2f confidence: %d\n", ransac_confidence_, iteration_number);
 	printf("\tElapsed time: %f secs\n", elapsed_seconds.count());
-	
+
+	if (model.descriptor.size() == 0)
+	{
+		// Clean up the memory occupied by the images
+		image1.release();
+		image2.release();
+		return;
+	}
+
 	// Compute the root mean square error (RMSE) using the ground truth inliers
 	double rmse = 0; // The RMSE error
 	// Iterate through all inliers and calculate the error

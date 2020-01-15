@@ -1,7 +1,6 @@
 #pragma once
 
 #include <limits>
-//#include <cv.h>
 #include <chrono>
 #include <memory>
 #include "model.h"
@@ -231,7 +230,13 @@ bool MAGSAC<DatumType, ModelEstimator>::run(
 				minimal_sample.get(), // The minimal sample
 				sample_size)) // The size of a minimal sample
 				continue;
-						 
+
+			// Check if the selected sample is valid before estimating the model
+			// parameters which usually takes more time. 
+			if (!estimator_.isValidSample(points_, // All points
+				minimal_sample.get())) // The current sample
+				continue;
+
 			// Estimate the model from the minimal sample
  			if (estimator_.estimateModel(points_, // All data points
 				minimal_sample.get(), // The selected minimal sample
@@ -520,11 +525,15 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensus(
 		&(final_weights)[0])) // Weights of points 
 		return false;
 
+	bool is_model_updated = false;
+	
 	if (sigma_models.size() == 1 && // If only a single model is estimated
 		estimator_.isValidModel(sigma_models.back(),
 			points_,
 			sigma_inliers,
-			interrupting_threshold)) // and it is valid
+			&(sigma_inliers)[0],
+			interrupting_threshold,
+			is_model_updated)) // and it is valid
 	{
 		// Return the refined model
 		refined_model_ = sigma_models.back();
@@ -782,11 +791,15 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensusPlusPlus(
 		updated = true;
 	}
 
+	bool is_model_updated = false;
+
 	if (updated && // If the model has been updated
 		estimator_.isValidModel(polished_model,
 			points_,
 			sigma_inliers,
-			interrupting_threshold)) // and it is valid
+			&(sigma_inliers[0]),
+			interrupting_threshold,
+			is_model_updated)) // and it is valid
 	{
 		// Return the refined model
 		refined_model_ = polished_model;
