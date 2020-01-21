@@ -16,6 +16,13 @@ If you use the algorithm, please cite
 	year = {2019},
 }
 
+@inproceedings{barath2019magsacplusplus,
+	author = {Barath, Daniel and Noskova, Jana and Ivashechkin, Maksym and Matas, Jiri},
+	title = {MAGSAC++, a fast, reliable and accurate robust estimator},
+	booktitle = {arXiv preprint:1912.05909},
+	year = {2019},
+}
+
 ```
 
 # Installation
