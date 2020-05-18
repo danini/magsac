@@ -90,9 +90,7 @@ void runTest(SceneType scene_type_,
 std::string dataset2str(Dataset dataset_);
 
 int main(int argc, const char* argv[])
-{
-	const std::string scenes[] = {"TUM", "KITTI","Tanks_and_Temples", "CPC" };
-	
+{	
 	/*
 		This is an example showing how MAGSAC or MAGSAC++ is applied to homography or fundamental matrix estimation tasks.
 		This implementation is not the one used in the experiments of the paper.
