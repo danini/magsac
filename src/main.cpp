@@ -64,8 +64,7 @@ void opencvEssentialMatrixFitting(
 	double ransac_confidence_,
 	double threshold_,
 	const std::string &test_scene_,
-	bool draw_results_ = false,
-	double drawing_threshold_ = 2);
+	bool draw_results_ = false);
 
 // A method applying OpenCV for fundamental matrix estimation to one of the built-in scenes
 void opencvFundamentalMatrixFitting(
@@ -198,11 +197,10 @@ void runTest(SceneType scene_type_, // The type of the fitting problem
 			opencvEssentialMatrixFitting(ransac_confidence_,
 				drawing_threshold_, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
-				false, // A flag to draw and show the results
-				false); // A flag to apply the MAGSAC post-processing to the OpenCV's output
+				false); // A flag to draw and show the results
 
 			// Apply MAGSAC with a reasonably set maximum threshold
-			printf("\n2. Running MAGSAC with reasonably set maximum threshold (%f px)\n", drawing_threshold_);
+			printf("\n2. Running MAGSAC with reasonably set maximum threshold (%f px)\n", 5.0);
 			testEssentialMatrixFitting(ransac_confidence_, // The required confidence in the results
 				5.0, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
@@ -740,8 +738,6 @@ void testHomographyFitting(
 			1600, // The width of the window
 			900); // The height of the window
 		out_image.release(); // Clean up the memory
-
-		cv::imwrite("evd_" + test_scene_ + ".jpg", out_image);
 	}
 
 	// Clean up the memory occupied by the images
@@ -1048,8 +1044,7 @@ void opencvEssentialMatrixFitting(
 	double ransac_confidence_,
 	double threshold_,
 	const std::string &test_scene_,
-	bool draw_results_,
-	double drawing_threshold_)
+	bool draw_results_)
 {
 	printf("\tProcessed scene = '%s'.\n", test_scene_.c_str());
 
@@ -1115,6 +1110,10 @@ void opencvEssentialMatrixFitting(
 
 	const size_t N = points.rows;
 
+	const double normalized_threshold =
+		threshold_ / ((intrinsics_source(0, 0) + intrinsics_source(1, 1) +
+			intrinsics_destination(0, 0) + intrinsics_destination(1, 1)) / 4.0);
+
 	// Define location of sub matrices in data matrix
 	cv::Rect roi1(0, 0, 2, N);
 	cv::Rect roi2(2, 0, 2, N);
@@ -1126,10 +1125,10 @@ void opencvEssentialMatrixFitting(
 	// Estimating the homography matrix by OpenCV's RANSAC
 	cv::Mat cv_essential_matrix = cv::findEssentialMat(cv::Mat(normalized_points, roi1), // The points in the first image
 		cv::Mat(normalized_points, roi2), // The points in the second image
-		cv_intrinsics_source, // The intrinsic camera matrix of the source image
+		cv::Mat::eye(3, 3, CV_64F), // The intrinsic camera matrix of the source image
         cv::RANSAC, // The method used for the fitting
 		ransac_confidence_, // The RANSAC confidence
-		threshold_, // The inlier-outlier threshold
+		normalized_threshold, // The inlier-outlier threshold
 		obtained_labeling); // The obtained labeling
 
 	// Convert cv::Mat to Eigen::Matrix3d 
@@ -1154,7 +1153,7 @@ void opencvEssentialMatrixFitting(
 	}
 
 	printf("\tNumber of points closer than %f = %d\n",
-		drawing_threshold_, inlier_number);
+		threshold_, inlier_number);
 
 	if (draw_results_)
 	{
@@ -1163,7 +1162,7 @@ void opencvEssentialMatrixFitting(
 		drawMatches<double, uchar>(points, obtained_labeling, image1, image2, out_image);
 
 		// Show the matches
-		std::string window_name = "Visualization with threshold = " + std::to_string(drawing_threshold_) + " px; Threshold is = " + std::to_string(threshold_);
+		std::string window_name = "Threshold = " + std::to_string(threshold_) + " px";
 		showImage(out_image,
 			window_name,
 			1600,
