@@ -66,6 +66,11 @@ public:
 		interrupting_threshold = threshold_;
 	}
 
+	double getReferenceThreshold()
+	{
+		return interrupting_threshold;
+	}
+
 	// Setting the flag determining if post-processing is needed
 	void applyPostProcessing(bool value_) 
 	{

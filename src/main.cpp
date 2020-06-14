@@ -353,12 +353,12 @@ void testEssentialMatrixFitting(
 		normalized_points);
 
 	// Normalize the threshold by the average of the focal lengths
+	const double normalizing_multiplier = 1.0 / ((intrinsics_source(0, 0) + intrinsics_source(1, 1) +
+		intrinsics_destination(0, 0) + intrinsics_destination(1, 1)) / 4.0);
 	const double normalized_maximum_threshold =
-		maximum_threshold_ / ((intrinsics_source(0, 0) + intrinsics_source(1, 1) +
-			intrinsics_destination(0, 0) + intrinsics_destination(1, 1)) / 4.0);
+		maximum_threshold_ * normalizing_multiplier;
 	const double normalized_drawing_threshold =
-		drawing_threshold_ / ((intrinsics_source(0, 0) + intrinsics_source(1, 1) +
-			intrinsics_destination(0, 0) + intrinsics_destination(1, 1)) / 4.0);
+		drawing_threshold_ * normalizing_multiplier;
 
 	// The number of points in the datasets
 	const size_t N = points.rows; // The number of points in the scene
@@ -384,6 +384,7 @@ void testEssentialMatrixFitting(
 
 	MAGSAC<cv::Mat, magsac::utils::DefaultEssentialMatrixEstimator> magsac;
 	magsac.setMaximumThreshold(normalized_maximum_threshold); // The maximum noise scale sigma allowed
+	magsac.setReferenceThreshold(magsac.getReferenceThreshold() * normalizing_multiplier); // The reference threshold inside MAGSAC++ should also be normalized.
 	magsac.setIterationLimit(1e4); // Iteration limit to interrupt the cases when the algorithm run too long.
 
 	int iteration_number = 0; // Number of iterations required
