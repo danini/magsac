@@ -111,7 +111,7 @@ int main(int argc, const char* argv[])
 
 	// Run homography estimation on the homogr dataset
 	runTest(SceneType::HomographyScene, Dataset::homogr, ransac_confidence, draw_results, drawing_threshold_homography);
-
+	
 	// Run fundamental matrix estimation on the kusvod2 dataset
 	runTest(SceneType::FundamentalMatrixScene, Dataset::kusvod2, ransac_confidence, draw_results, drawing_threshold_fundamental_matrix);
 
@@ -388,6 +388,7 @@ void testEssentialMatrixFitting(
 	magsac.setIterationLimit(1e4); // Iteration limit to interrupt the cases when the algorithm run too long.
 
 	int iteration_number = 0; // Number of iterations required
+	ModelScore score; // The model score
 
 	std::chrono::time_point<std::chrono::system_clock> end,
 		start = std::chrono::system_clock::now();
@@ -396,7 +397,8 @@ void testEssentialMatrixFitting(
 		estimator, // The used estimator
 		main_sampler, // The sampler used for selecting minimal samples in each iteration
 		model, // The estimated model
-		iteration_number); // The number of iterations
+		iteration_number, // The number of iterations
+		score); // The score of the estimated model
 	end = std::chrono::system_clock::now();
 
 	std::chrono::duration<double> elapsed_seconds = end - start;
@@ -489,7 +491,7 @@ void testFundamentalMatrixFitting(
 		return; 
 	}
 
-	magsac::utils::DefaultFundamentalMatrixEstimator estimator(0.1); // The robust homography estimator class containing the function for the fitting and residual calculation
+	magsac::utils::DefaultFundamentalMatrixEstimator estimator(maximum_threshold_); // The robust homography estimator class containing the function for the fitting and residual calculation
 	gcransac::FundamentalMatrix model; // The estimated model
 
 	// In this used datasets, the manually selected inliers are not all inliers but a subset of them.
@@ -518,12 +520,13 @@ void testFundamentalMatrixFitting(
 
 	// Initialize the sampler used for selecting minimal samples
 	gcransac::sampler::UniformSampler main_sampler(&points);
-	
+	 
 	MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator> magsac;
 	magsac.setMaximumThreshold(maximum_threshold_); // The maximum noise scale sigma allowed
 	magsac.setIterationLimit(1e4); // Iteration limit to interrupt the cases when the algorithm run too long.
 
 	int iteration_number = 0; // Number of iterations required
+	ModelScore score; // The model score
 
 	std::chrono::time_point<std::chrono::system_clock> end,
 		start = std::chrono::system_clock::now();
@@ -532,7 +535,8 @@ void testFundamentalMatrixFitting(
 		estimator, // The used estimator
 		main_sampler, // The sampler used for selecting minimal samples in each iteration
 		model, // The estimated model
-		iteration_number); // The number of iterations
+		iteration_number, // The number of iterations
+		score); // The score of the estimated model
 	end = std::chrono::system_clock::now();
 
 	std::chrono::duration<double> elapsed_seconds = end - start;
@@ -669,6 +673,7 @@ void testHomographyFitting(
 	magsac.setReferenceThreshold(2.0);
 
 	int iteration_number = 0; // Number of iterations required
+	ModelScore score; // The model score
 
 	std::chrono::time_point<std::chrono::system_clock> end, 
 		start = std::chrono::system_clock::now();
@@ -677,7 +682,8 @@ void testHomographyFitting(
 		estimator, // The used estimator
 		main_sampler, // The sampler used for selecting minimal samples in each iteration
 		model, // The estimated model
-		iteration_number); // The number of iterations
+		iteration_number, // The number of iterations
+		score); // The score of the estimated model
 	end = std::chrono::system_clock::now();
 	 
 	std::chrono::duration<double> elapsed_seconds = end - start; 
@@ -936,7 +942,7 @@ void opencvFundamentalMatrixFitting(
 		return;
 	}
 
-	magsac::utils::DefaultFundamentalMatrixEstimator estimator; // The robust homography estimator class containing the function for the fitting and residual calculation
+	gcransac::utils::DefaultFundamentalMatrixEstimator estimator; // The robust homography estimator class containing the function for the fitting and residual calculation
 	gcransac::FundamentalMatrix model; // The estimated model parameters
 
 	// In this used datasets, the manually selected inliers are not all inliers but a subset of them.
@@ -944,7 +950,7 @@ void opencvFundamentalMatrixFitting(
 	// (i) First, the implied model is estimated from the manually selected inliers.
 	// (ii) Second, the inliers of the ground truth model are selected.
 	std::vector<int> refined_labels = ground_truth_labels;
-	refineManualLabeling<gcransac::FundamentalMatrix, magsac::utils::DefaultFundamentalMatrixEstimator>(
+	refineManualLabeling<gcransac::FundamentalMatrix, gcransac::utils::DefaultFundamentalMatrixEstimator>(
 		points, // All data points
 		ground_truth_labels, // The refined labeling
 		estimator, // The estimator used for determining the underlying model
