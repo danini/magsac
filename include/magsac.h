@@ -51,7 +51,8 @@ public:
 		ModelEstimator& estimator_, // The model estimator
 		gcransac::sampler::Sampler<cv::Mat, size_t> &sampler_, // The sampler used
 		gcransac::Model &obtained_model_, // The estimated model parameters
-		int &iteration_number_); // The number of iterations done
+		int &iteration_number_, // The number of iterations done
+		ModelScore &model_score_); // The score of the estimated model
 		
 	// A function to set the maximum inlier-outlier threshold 
 	void setMaximumThreshold(const double maximum_threshold_) 
@@ -186,7 +187,8 @@ bool MAGSAC<DatumType, ModelEstimator>::run(
 	ModelEstimator& estimator_,
 	gcransac::sampler::Sampler<cv::Mat, size_t> &sampler_,
 	gcransac::Model& obtained_model_,
-	int& iteration_number_)
+	int& iteration_number_,
+	ModelScore &model_score_)
 {
 	// Initialize variables
 	std::chrono::time_point<std::chrono::system_clock> start, end; // Variables for time measuring: start and end times
@@ -250,8 +252,7 @@ bool MAGSAC<DatumType, ModelEstimator>::run(
 		}         
 
 		// If the method was not able to generate any usable models, break the cycle.
-		if (unsuccessful_model_generations >= max_unsuccessful_model_generations)
-			break;
+		iteration += unsuccessful_model_generations - 1;
 
 		// Select the so-far-the-best from the estimated models
 		for (const auto &model : models)
@@ -312,6 +313,7 @@ bool MAGSAC<DatumType, ModelEstimator>::run(
 	
 	obtained_model_ = so_far_the_best_model;
 	iteration_number_ = iteration;
+	model_score_ = so_far_the_best_score;
 
 	return so_far_the_best_score.score > 0;
 }
