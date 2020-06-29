@@ -8,7 +8,66 @@
 namespace magsac
 {
 	namespace estimator
-	{
+	{// This is the estimator class for estimating a fundamental matrix between two images. 
+		template<class _MinimalSolverEngine,  // The solver used for estimating the model from a minimal sample
+			class _NonMinimalSolverEngine> // The solver used for estimating the model from a non-minimal sample
+			class HomographyEstimator :
+			public gcransac::estimator::RobustHomographyEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>
+		{
+		public:
+			using gcransac::estimator::RobustHomographyEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>::residual;
+
+			HomographyEstimator() :
+				gcransac::estimator::RobustHomographyEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>()
+			{}
+
+			// Calculating the residual which is used for the MAGSAC score calculation.
+			// Since symmetric epipolar distance is usually more robust than Sampson-error.
+			// we are using it for the score calculation.
+			inline double residualForScoring(const cv::Mat& point_,
+				const gcransac::Model& model_) const
+			{
+				return residual(point_, model_.descriptor);
+			}
+
+			static constexpr double getSigmaQuantile()
+			{
+				return 3.64;
+			}
+
+			static constexpr size_t getDegreesOfFreedom()
+			{
+				return 4;
+			}
+
+			static constexpr double getC()
+			{
+				return 0.25;
+			}
+
+			// Calculating the upper incomplete gamma value of (DoF - 1) / 2 with k^2 / 2.
+			static constexpr double getGammaFunction()
+			{
+				return 1.0;
+			}
+
+			static constexpr double getUpperIncompleteGammaOfK()
+			{
+				return 0.0036572608340910764;
+			}
+
+			// Calculating the lower incomplete gamma value of (DoF + 1) / 2 with k^2 / 2.
+			static constexpr double getLowerIncompleteGammaOfK()
+			{
+				return 1.3012265540498875;
+			}
+
+			static constexpr double getChiSquareParamCp()
+			{
+				return 1.0 / (4.0 * getGammaFunction());
+			}
+		};
+
 		// This is the estimator class for estimating a fundamental matrix between two images. 
 		template<class _MinimalSolverEngine,  // The solver used for estimating the model from a minimal sample
 			class _NonMinimalSolverEngine> // The solver used for estimating the model from a non-minimal sample
@@ -16,9 +75,16 @@ namespace magsac
 			public gcransac::estimator::FundamentalMatrixEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>
 		{
 		protected:
+			using gcransac::estimator::FundamentalMatrixEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>::use_degensac;
+			using gcransac::estimator::FundamentalMatrixEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>::minimum_inlier_ratio_in_validity_check;
+			using gcransac::estimator::FundamentalMatrixEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>::squared_homography_threshold;
+
 			const double maximum_threshold;
 
 		public:
+			using gcransac::estimator::FundamentalMatrixEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>::squaredSymmetricEpipolarDistance;
+			using gcransac::estimator::FundamentalMatrixEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>::sampleSize;
+
 			FundamentalMatrixEstimator(
 				const double maximum_threshold_,
 				const double minimum_inlier_ratio_in_validity_check_ = 0.1,
@@ -36,7 +102,7 @@ namespace magsac
 			inline double residualForScoring(const cv::Mat& point_,
                 const gcransac::Model& model_) const
 			{
-				return std::sqrt(squaredSymmetricEpipolarDistance(point_, model_.descriptor));
+				return std::sqrt(gcransac::estimator::FundamentalMatrixEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>::squaredSymmetricEpipolarDistance(point_, model_.descriptor));
 			}
 
 			static constexpr double getSigmaQuantile()
@@ -95,10 +161,11 @@ namespace magsac
 				bool passed = false;
 				size_t inlier_number = 0; // Number of inlier if using symmetric epipolar distance
 				const Eigen::Matrix3d &descriptor = model_.descriptor; // The decriptor of the current model
-				constexpr size_t sample_size = sampleSize(); // Size of a minimal sample
+				constexpr size_t sample_size = gcransac::estimator::FundamentalMatrixEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>::sampleSize(); // Size of a minimal sample
 				// Minimum number of inliers which should be inlier as well when using symmetric epipolar distance instead of Sampson distance
+				const size_t inliers_to_pass = inliers_.size() * gcransac::estimator::FundamentalMatrixEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>::minimum_inlier_ratio_in_validity_check;
 				const size_t minimum_inlier_number =
-					MAX(sample_size, inliers_.size() * minimum_inlier_ratio_in_validity_check);
+					MAX(sample_size, inliers_to_pass);
 				// Squared inlier-outlier threshold
 				const double squared_threshold = threshold_ * threshold_;
 
@@ -106,7 +173,7 @@ namespace magsac
 				for (const auto &idx : inliers_)
 					// Calculate the residual using symmetric epipolar distance and check if
 					// it is smaller than the threshold_.
-					if (squaredSymmetricEpipolarDistance(data_.row(idx), descriptor) < squared_threshold)
+					if (gcransac::estimator::FundamentalMatrixEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>::squaredSymmetricEpipolarDistance(data_.row(idx), descriptor) < squared_threshold)
 						// Increase the inlier number and terminate if enough inliers_ have been found.
 						if (++inlier_number >= minimum_inlier_number)
 						{
@@ -120,7 +187,7 @@ namespace magsac
 					return false;
 				 
 				// Validate the model by checking if the scene is dominated by a single plane.
-				if (use_degensac)
+				if (gcransac::estimator::FundamentalMatrixEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>::use_degensac)
 					return applyDegensac(model_,
 						data_,
 						inliers_,
@@ -377,6 +444,8 @@ namespace magsac
 			public gcransac::estimator::EssentialMatrixEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>
 		{
 		public:
+			using gcransac::estimator::EssentialMatrixEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>::squaredSymmetricEpipolarDistance;
+
 			EssentialMatrixEstimator(Eigen::Matrix3d intrinsics_src_, // The intrinsic parameters of the source camera
 				Eigen::Matrix3d intrinsics_dst_,  // The intrinsic parameters of the destination camera
 				const double minimum_inlier_ratio_in_validity_check_ = 0.5,
@@ -418,64 +487,6 @@ namespace magsac
 			}
 
 			// Calculating the upper incomplete gamma value of (DoF - 1) / 2 with k^2 / 2.
-			static constexpr double getUpperIncompleteGammaOfK()
-			{
-				return 0.0036572608340910764;
-			}
-
-			// Calculating the lower incomplete gamma value of (DoF + 1) / 2 with k^2 / 2.
-			static constexpr double getLowerIncompleteGammaOfK()
-			{
-				return 1.3012265540498875;
-			}
-
-			static constexpr double getChiSquareParamCp()
-			{
-				return 1.0 / (4.0 * getGammaFunction());
-			}
-		};
-
-		// This is the estimator class for estimating a fundamental matrix between two images. 
-		template<class _MinimalSolverEngine,  // The solver used for estimating the model from a minimal sample
-			class _NonMinimalSolverEngine> // The solver used for estimating the model from a non-minimal sample
-			class HomographyEstimator :
-			public gcransac::estimator::RobustHomographyEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>
-		{
-		public:
-			HomographyEstimator() :
-				gcransac::estimator::RobustHomographyEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>()
-			{}
-
-			// Calculating the residual which is used for the MAGSAC score calculation.
-			// Since symmetric epipolar distance is usually more robust than Sampson-error.
-			// we are using it for the score calculation.
-			inline double residualForScoring(const cv::Mat& point_,
-                const gcransac::Model& model_) const
-			{
-				return residual(point_, model_.descriptor);
-			}
-			
-			static constexpr double getSigmaQuantile()
-			{
-				return 3.64;
-			}
-
-			static constexpr size_t getDegreesOfFreedom()
-			{
-				return 4;
-			}
-
-			static constexpr double getC()
-			{
-				return 0.25;
-			}
-
-			// Calculating the upper incomplete gamma value of (DoF - 1) / 2 with k^2 / 2.
-			static constexpr double getGammaFunction()
-			{
-				return 1.0;
-			}
-
 			static constexpr double getUpperIncompleteGammaOfK()
 			{
 				return 0.0036572608340910764;
