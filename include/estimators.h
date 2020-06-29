@@ -4,6 +4,7 @@
 #include "fundamental_estimator.h"
 #include "homography_estimator.h"
 #include "model.h"
+
 namespace magsac
 {
 	namespace estimator
@@ -80,7 +81,7 @@ namespace magsac
 			// robust to degenerate solutions than the symmetric epipolar distance. Therefore,
 			// every so-far-the-best model is checked if it has enough inlier with symmetric
 			// epipolar distance as well. 
-			bool isValidModel(Model& model_,
+			bool isValidModel(gcransac::Model& model_,
 				const cv::Mat& data_,
 				const std::vector<size_t> &inliers_,
 				const size_t *minimal_sample_,
@@ -133,7 +134,7 @@ namespace magsac
 			}
 
 			//  Evaluate the H-degenerate sample test and apply DEGENSAC if needed
-			inline bool applyDegensac(Model& model_, // The input model to be tested
+			inline bool applyDegensac(gcransac::Model& model_, // The input model to be tested
 				const cv::Mat& data_, // All data points
 				const std::vector<size_t> &inliers_, // The inliers of the input model
 				const size_t *minimal_sample_, // The minimal sample used for estimating the model
@@ -307,7 +308,7 @@ namespace magsac
 
 					// The set of estimated homographies. For all implemented solvers,
 					// this should be of size 1.
-					std::vector<Model> homographies;
+					std::vector<gcransac::Model> homographies;
 
 					// Estimate the homography parameters from the provided inliers.
 					homography_estimator.estimateModelNonminimal(data_, // All data points
@@ -332,7 +333,7 @@ namespace magsac
 					estimator.getMinimalSolver()->setHomography(&nonminimal_homography);
 
 					std::vector<int> inliers;
-					Model model;
+					gcransac::Model model;
 
 					MAGSAC<cv::Mat, magsac::estimator::FundamentalMatrixEstimator<
 						gcransac::estimator::solver::FundamentalMatrixPlaneParallaxSolver, // The solver used for fitting a model to a minimal sample
