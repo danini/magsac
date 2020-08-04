@@ -463,7 +463,7 @@ namespace magsac
 			inline double residualForScoring(const cv::Mat& point_,
                 const gcransac::Model& model_) const
 			{
-				return squaredSymmetricEpipolarDistance(point_, model_.descriptor);
+				return std::sqrt(squaredSymmetricEpipolarDistance(point_, model_.descriptor));
 			}
 
 			static constexpr double getSigmaQuantile()
