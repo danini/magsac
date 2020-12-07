@@ -111,7 +111,7 @@ int main(int argc, const char* argv[])
 
 	// Run homography estimation on the homogr dataset
 	runTest(SceneType::HomographyScene, Dataset::homogr, ransac_confidence, draw_results, drawing_threshold_homography);
-	
+
 	// Run fundamental matrix estimation on the kusvod2 dataset
 	runTest(SceneType::FundamentalMatrixScene, Dataset::kusvod2, ransac_confidence, draw_results, drawing_threshold_fundamental_matrix);
 
@@ -168,7 +168,7 @@ void runTest(SceneType scene_type_, // The type of the fitting problem
 			testHomographyFitting(ransac_confidence_,
 				50.0, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
-				true, // A flag to draw and show the results  
+				draw_results_, // A flag to draw and show the results  
 				2.5); // The inlier threshold for visualization.
 		} else if (scene_type_ == SceneType::FundamentalMatrixScene)
 		{
@@ -202,7 +202,7 @@ void runTest(SceneType scene_type_, // The type of the fitting problem
 			testEssentialMatrixFitting(ransac_confidence_, // The required confidence in the results
 				5.0, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
-				true, // A flag to draw and show the results 
+				draw_results_, // A flag to draw and show the results 
 				drawing_threshold_); // The inlier threshold for visualization.
 		}
 
