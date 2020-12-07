@@ -11,14 +11,14 @@ If you use the algorithm, please cite
 ```
 @inproceedings{barath2019magsac,
 	author = {Barath, Daniel and Matas, Jiri and Noskova, Jana},
-	title = {MAGSAC: marginalizing sample consensus},
+	title = {{MAGSAC}: marginalizing sample consensus},
 	booktitle = {Conference on Computer Vision and Pattern Recognition},
 	year = {2019},
 }
 
 @inproceedings{barath2019magsacplusplus,
 	author = {Barath, Daniel and Noskova, Jana and Ivashechkin, Maksym and Matas, Jiri},
-	title = {MAGSAC++, a fast, reliable and accurate robust estimator},
+	title = {{MAGSAC}++, a fast, reliable and accurate robust estimator},
 	booktitle = {arXiv preprint:1912.05909},
 	year = {2019},
 }
