@@ -66,6 +66,11 @@ namespace magsac
 			{
 				return 1.0 / (4.0 * getGammaFunction());
 			}
+
+			static constexpr bool doesNormalizationForNonMinimalFitting()
+			{
+				return true;
+			}
 		};
 
 		// This is the estimator class for estimating a fundamental matrix between two images. 
@@ -140,6 +145,11 @@ namespace magsac
 			static constexpr double getChiSquareParamCp()
 			{
 				return 1.0 / (4.0 * getGammaFunction());
+			}
+
+			static constexpr bool doesNormalizationForNonMinimalFitting()
+			{
+				return true;
 			}
 
 			// Validate the model by checking the number of inlier with symmetric epipolar distance
@@ -448,7 +458,7 @@ namespace magsac
 
 			EssentialMatrixEstimator(Eigen::Matrix3d intrinsics_src_, // The intrinsic parameters of the source camera
 				Eigen::Matrix3d intrinsics_dst_,  // The intrinsic parameters of the destination camera
-				const double minimum_inlier_ratio_in_validity_check_ = 0.5,
+				const double minimum_inlier_ratio_in_validity_check_ = 0.1,
 				const double point_ratio_for_selecting_from_multiple_models_ = 0.05) :
 				gcransac::estimator::EssentialMatrixEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>(
 					intrinsics_src_,
@@ -484,6 +494,11 @@ namespace magsac
 			static constexpr double getGammaFunction()
 			{
 				return 1.0;
+			}
+
+			static constexpr bool doesNormalizationForNonMinimalFitting()
+			{
+				return false;
 			}
 
 			// Calculating the upper incomplete gamma value of (DoF - 1) / 2 with k^2 / 2.

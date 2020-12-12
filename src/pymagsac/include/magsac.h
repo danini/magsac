@@ -97,7 +97,7 @@ public:
 	void setCoreNumber(size_t core_number_)
 	{
 		if (magsac_version == MAGSAC_PLUS_PLUS)
-			fprintf(stderr, "Setting the core number for MAGSAC++ is deprecated.");
+			fprintf(stderr, "Setting the core number for MAGSAC++ is deprecated.\n");
 		core_number = core_number_;
 	}
 
@@ -106,7 +106,7 @@ public:
 	void setPartitionNumber(size_t partition_number_)
 	{
 		if (magsac_version == MAGSAC_PLUS_PLUS)
-			fprintf(stderr, "Setting the partition number for MAGSAC++ is deprecated.");
+			fprintf(stderr, "Setting the partition number for MAGSAC++ is deprecated.\n");
 		partition_number = partition_number_;
 	}
 
@@ -195,7 +195,7 @@ bool MAGSAC<DatumType, ModelEstimator>::run(
 	std::chrono::duration<double> elapsed_seconds; // Variables for time measuring: elapsed time
 	log_confidence = log(1.0 - confidence_); // The logarithm of 1 - confidence
 	point_number = points_.rows; // Number of points
-	const int sample_size = estimator_.sampleSize(); // The sample size required for the estimation
+	constexpr size_t sample_size = estimator_.sampleSize(); // The sample size required for the estimation
 	size_t max_iteration = iteration_limit; // The maximum number of iterations initialized to the iteration limit
 	int iteration = 0; // Current number of iterations
 	gcransac::Model so_far_the_best_model; // Current best model
@@ -499,7 +499,15 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensus(
 #endif
 
 	// The weights used for the final weighted least-squares fitting
-	final_weights.reserve(possible_inlier_number);
+	// If point normalization is applied the indexing of the weights differs.
+	// In that case
+	//		final_weights[i] is the weight of inlier[i]-th point
+	// Otherwise,
+	//		final_weights[i] is the weight of i-th point
+	if constexpr (ModelEstimator::doesNormalizationForNonMinimalFitting())
+		final_weights.reserve(possible_inlier_number);
+	else
+		final_weights.resize(point_number, 0);
 
 	// Collect all points which has higher probability of being inlier than zero
 	sigma_inliers.reserve(possible_inlier_number);
@@ -516,7 +524,11 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensus(
 
 		// Store the index and weight of the current point
 		sigma_inliers.emplace_back(all_residuals[point_idx].second);
-		final_weights.emplace_back(weight);
+
+		if constexpr (ModelEstimator::doesNormalizationForNonMinimalFitting())
+			final_weights.emplace_back(weight);
+		else
+			final_weights[point_idx] = weight;
 	}
 
 	// If there are fewer inliers than the size of the minimal sample interupt the procedure
@@ -627,7 +639,6 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensusPlusPlus(
 			{
 				// Store the residual of the current point and its index
 				residuals.emplace_back(std::make_pair(residual, point_idx));
-				// all_residuals.emplace_back(std::make_pair(residual * threshold_to_sigma_multiplier, point_idx));
 
 				// Count points which are closer than a reference threshold to speed up the procedure
 				if (residual < interrupting_threshold)
@@ -739,6 +750,9 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensusPlusPlus(
 			sigma_weights.reserve(possible_inlier_number);
 		}
 
+		if constexpr (!ModelEstimator::doesNormalizationForNonMinimalFitting())
+			sigma_weights.resize(point_number, 0);
+
 		// Calculate the weight of each point
 		for (const auto &[residual, idx] : residuals)
 		{
@@ -765,7 +779,10 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensusPlusPlus(
 			}
 
 			// Store the weight of the point 
-			sigma_weights.emplace_back(weight);
+			if constexpr (ModelEstimator::doesNormalizationForNonMinimalFitting())
+				sigma_weights.emplace_back(weight);
+			else
+				sigma_weights[idx] = weight;
 		}
 
 		// If there are fewer than the minimum point close to the model,
@@ -785,7 +802,7 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensusPlusPlus(
 			// terminate with failure.
 			if (iterations == 0)
 				return false;
-			// Otherwise, if the iteration was successfull at least one,
+			// Otherwise, if the iteration was successfull at least once,
 			// simply break it. 
 			break;
 		}

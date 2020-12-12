@@ -5,6 +5,18 @@ project(MAGSAC LANGUAGES CXX)
 # indicate if OPENMP should be enabled
 option(USE_OPENMP "Use OPENMP" ON)
 
+# indicate if the sample project should be generated
+option(CREATE_SAMPLE_PROJECT "Create the Sample Project" ON)
+
+SET (CMAKE_BUILD_TYPE "RELEASE")
+
+IF(CMAKE_COMPILER_IS_GNUCXX)
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-strict-aliasing")
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wextra -Wno-write-strings")
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated -ansi")
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ftree-vectorize -funroll-loops")
+ENDIF(CMAKE_COMPILER_IS_GNUCXX)
+
 # ==============================================================================
 # Check C++17 support
 # ==============================================================================
@@ -15,7 +27,12 @@ set(CMAKE_CXX_FLAGS "-fpermissive")
 # ==============================================================================
 # Find OpenCV
 # ==============================================================================
-find_package(OpenCV )
+find_package(OpenCV)
+if (OPENCV_FOUND)
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenCV_CXX_FLAGS}")
+  	add_definitions(-DUSE_OPENMP)
+	set(TRGT_LNK_LBS_ADDITIONAL OpenMP::OpenMP_CXX)
+endif (OPENCV_FOUND)
 
 # ==============================================================================
 # Find Eigen
@@ -38,8 +55,9 @@ endif (USE_OPENMP)
 # ==============================================================================
 # Includes
 # ==============================================================================
+SET(SOURCE_DIR "src/pymagsac")
+
 include_directories (
-	${PROJECT_SOURCE_DIR}/include
 	${PROJECT_SOURCE_DIR}/graph-cut-ransac/src/pygcransac/include
 )
 
@@ -68,42 +86,63 @@ target_link_libraries(GraphCutRANSAC
 # ==============================================================================
 # Structure: MAGSAC Library
 # ==============================================================================
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
+
+# Tell cmake that headers are in alse in source_dir
+include_directories (${SOURCE_DIR}/include)
 
 # Set header files for the library
 file(GLOB_RECURSE HDRS_MAGSAC
-	"include/*.h"
-	"include/*.cpp"
+	"${SOURCE_DIR}/include/*.h"
 ) 
 
 # Set source files to be added to the library
 file(GLOB_RECURSE SRCS_MAGSAC 
-	"src/*.cpp"
+	"${SOURCE_DIR}/include/*.cpp"
 )
 
-add_executable(${PROJECT_NAME}
-	${HDRS_MAGSAC}
-	${SRCS_MAGSAC}
-)
+# ==============================================================================
+# Structure: Python binding
+# ==============================================================================
+# Generate python module
+add_subdirectory(lib/pybind11)
+
+pybind11_add_module(pymagsac 
+	${SOURCE_DIR}/src/bindings.cpp 
+	${SOURCE_DIR}/src/magsac_python.cpp
+	${HDRS_MAGSAC} 
+	${SRCS_MAGSAC})
+
+target_link_libraries(pymagsac PRIVATE  
+	${OpenCV_LIBS} 
+	Eigen3::Eigen
+	GraphCutRANSAC)
+
+add_library(${PROJECT_NAME} STATIC 
+	${HDRS_MAGSAC} 
+	${SRCS_MAGSAC})
 
 target_link_libraries(${PROJECT_NAME} 
 	${OpenCV_LIBS}
 	Eigen3::Eigen
+	GraphCutRANSAC
 )
+
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 	
 # ==============================================================================
 # Structure: Applications
 # ==============================================================================
 if (CREATE_SAMPLE_PROJECT)
-	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+	set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/build)
 
 	add_executable(SampleProject
-		src/main.cpp)
+		examples/cpp_example.cpp)
 		
-	target_link_libraries(SampleProject 
+	target_link_libraries(SampleProject PUBLIC
 		${PROJECT_NAME}
 		${OpenCV_LIBS}
 		Eigen3::Eigen
+		GraphCutRANSAC
 	)
 
 	add_dependencies(SampleProject ${PROJECT_NAME})
