@@ -8,6 +8,8 @@ The MAGSAC++ available at [Link](https://openaccess.thecvf.com/content_CVPR_2020
 
 Both methods are explained in the [Latest developments in RANSAC presentation](https://www.youtube.com/watch?v=Nfd9dzeSSG8&feature=youtu.be) from CVPR tutorial [RANSAC in 2020](http://cmp.felk.cvut.cz/cvpr2020-ransac-tutorial/).
 
+Experiments on homography, fundamental matrix, essential matrix, and 6D pose estimation are shown in the corresponding [presentation](https://www.youtube.com/watch?v=igRydL72160&feature=youtu.be) from the tutorial RANSAC in 2020.
+
 Tested on OpenCV 3.46 and 4.3.
 To run the executable with the examples, copy the "data" folder next to the executable or set the path in the main() function.
 
