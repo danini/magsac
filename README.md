@@ -1,4 +1,4 @@
-# The MAGSAC algorithm for robust model fitting without using an inlier-outlier threshold
+# The MAGSAC and MAGSAC++ algorithms for robust model fitting without using a single inlier-outlier threshold
 
 The MAGSAC and MAGSAC++ algorithms proposed for robust model estimation without a single inlier-outlier threshold.
 
@@ -67,7 +67,3 @@ The example for essential matrix fitting is available at: [notebook](examples/ex
 - CMake 2.8.12 or higher
 - OpenCV 3.0 or higher
 - A modern compiler with C++17 support
-
-# Python wrapper
-
-The Python wrapper for MAGSAC can be found at https://github.com/ducha-aiki/pymagsac thanks to Dmytro Mishkin.
