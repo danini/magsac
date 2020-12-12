@@ -25,15 +25,41 @@ If you use the algorithm, please cite
 
 ```
 
-# Installation
+# Installation C++
 
-To build and install `MAGSAC`, clone or download this repository and, also, the sub-modules. Then build the project by CMAKE. 
+To build and install C++-only `MAGSAC`/`MAGSAC++`, clone or download this repository and then build the project by CMAKE. 
+```shell
+$ git clone https://github.com/danini/magsac --recursive
+$ cd build
+$ cmake ..
+$ make
+```
+
+# Install Python package and compile C++
+
+```bash
+python3 ./setup.py install
+```
+
+or
+
+```bash
+pip3 install -e .
+```
 
 # Example project
 
 To build the sample project showing examples of fundamental matrix, homography and essential matrix fitting, set variable `CREATE_SAMPLE_PROJECT = ON` when creating the project in CMAKE. 
 
 Next to the executable, copy the `data` folder and, also, create a `results` folder. 
+
+# Jupyter Notebook example
+
+The example for homography fitting is available at: [notebook](examples/example_homography.ipynb).
+
+The example for fundamental matrix fitting is available at: [notebook](examples/example_fundamental_matrix.ipynb).
+
+The example for essential matrix fitting is available at: [notebook](examples/example_essential_matrix.ipynb).
 
 # Requirements
 
