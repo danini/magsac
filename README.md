@@ -1,7 +1,9 @@
 # The MAGSAC and MAGSAC++ algorithms for robust model fitting without using a single inlier-outlier threshold
 
 The MAGSAC and MAGSAC++ algorithms proposed for robust model estimation without a single inlier-outlier threshold.
+
 The MAGSAC paper is available at [Link](https://openaccess.thecvf.com/content_CVPR_2019/html/Barath_MAGSAC_Marginalizing_Sample_Consensus_CVPR_2019_paper.html).
+
 The MAGSAC++ available at [Link](https://openaccess.thecvf.com/content_CVPR_2020/papers/Barath_MAGSAC_a_Fast_Reliable_and_Accurate_Robust_Estimator_CVPR_2020_paper.pdf).
 
 Tested on OpenCV 3.46 and 4.3.
