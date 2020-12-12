@@ -67,3 +67,16 @@ The example for essential matrix fitting is available at: [notebook](examples/ex
 - CMake 2.8.12 or higher
 - OpenCV 3.0 or higher
 - A modern compiler with C++17 support
+
+# Performance of MAGSAC++
+
+MAGSAC++ is the state of the art according to "RANSAC in 2020" CVPR tutorial's [experiments](http://cmp.felk.cvut.cz/cvpr2020-ransac-tutorial/presentations/RANSAC-CVPR20-Mishkin.pdf).
+
+# Performance of MAGSAC
+
+MAGSAC is the state of the art according to the recent study Yin et.al."[Image Matching across Wide Baselines: From Paper to Practice](https://arxiv.org/abs/2003.01587.pdf)", 2020.
+
+![IMW-benchmark](img/ransacs.png)
+
+
+![IMW-Challenge](img/ransacs2.png)
