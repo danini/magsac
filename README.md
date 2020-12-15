@@ -2,7 +2,15 @@
 
 The MAGSAC and MAGSAC++ algorithms proposed for robust model estimation without a single inlier-outlier threshold.
 
-Made in OpenCV 3.46.
+The MAGSAC paper is available at [Link](https://openaccess.thecvf.com/content_CVPR_2019/html/Barath_MAGSAC_Marginalizing_Sample_Consensus_CVPR_2019_paper.html).
+
+The MAGSAC++ available at [Link](https://openaccess.thecvf.com/content_CVPR_2020/papers/Barath_MAGSAC_a_Fast_Reliable_and_Accurate_Robust_Estimator_CVPR_2020_paper.pdf).
+
+Both methods are explained in the [Latest developments in RANSAC presentation](https://www.youtube.com/watch?v=Nfd9dzeSSG8&feature=youtu.be) from CVPR tutorial [RANSAC in 2020](http://cmp.felk.cvut.cz/cvpr2020-ransac-tutorial/).
+
+Experiments on homography, fundamental matrix, essential matrix, and 6D pose estimation are shown in the corresponding [presentation](https://www.youtube.com/watch?v=igRydL72160&feature=youtu.be) from the tutorial RANSAC in 2020.
+
+Tested on OpenCV 3.46 and 4.3.
 To run the executable with the examples, copy the "data" folder next to the executable or set the path in the main() function.
 
 
@@ -19,8 +27,8 @@ If you use the algorithm, please cite
 @inproceedings{barath2019magsacplusplus,
 	author = {Barath, Daniel and Noskova, Jana and Ivashechkin, Maksym and Matas, Jiri},
 	title = {{MAGSAC}++, a fast, reliable and accurate robust estimator},
-	booktitle = {arXiv preprint:1912.05909},
-	year = {2019},
+	booktitle = {Conference on Computer Vision and Pattern Recognition},
+	year = {2020},
 }
 
 ```
@@ -67,3 +75,16 @@ The example for essential matrix fitting is available at: [notebook](examples/ex
 - CMake 2.8.12 or higher
 - OpenCV 3.0 or higher
 - A modern compiler with C++17 support
+
+# Performance of MAGSAC++
+
+MAGSAC++ is the state of the art according to "RANSAC in 2020" CVPR tutorial's [experiments](http://cmp.felk.cvut.cz/cvpr2020-ransac-tutorial/presentations/RANSAC-CVPR20-Mishkin.pdf).
+
+# Performance of MAGSAC
+
+MAGSAC is the state of the art according to the recent study Yin et.al."[Image Matching across Wide Baselines: From Paper to Practice](https://arxiv.org/abs/2003.01587.pdf)", 2020.
+
+![IMW-benchmark](img/ransacs.png)
+
+
+![IMW-Challenge](img/ransacs2.png)
