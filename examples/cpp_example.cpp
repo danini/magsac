@@ -15,6 +15,7 @@
 #include "magsac_utils.h"
 #include "utils.h"
 #include "magsac.h"
+#include "most_similar_inlier_selector.h"
 
 #include "uniform_sampler.h"
 #include "flann_neighborhood_graph.h"
@@ -604,16 +605,24 @@ void testFundamentalMatrixFitting(
 	{
 		std::vector<int> obtained_labeling(points.rows, 0);
 
-		for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx)
-		{
-			// Computing the residual of the point given the estimated model
-			auto residual = estimator.residual(points.row(pt_idx),
-				model.descriptor);
-			
-			// Change the label to 'inlier' if the residual is smaller than the threshold
-			if (drawing_threshold_ >= residual)
-				obtained_labeling[pt_idx] = 1;
-		}
+		MostSimilarInlierSelector<magsac::utils::DefaultFundamentalMatrixEstimator>
+			inlierSelector(estimator.sampleSize() + 1,
+				maximum_threshold_);
+
+		std::vector<size_t> selectedInliers;
+		double bestThreshold;
+		inlierSelector.selectInliers(points,
+			estimator,
+			model,
+			selectedInliers,
+			bestThreshold);
+
+		for (const auto& inlierIdx : selectedInliers)
+			obtained_labeling[inlierIdx] = 1;
+
+		printf("\t%d inliers are selected adaptively.\n\tThe best threshold is = %f.\n",
+			selectedInliers.size(),
+			bestThreshold);
 
 		// Draw the matches to the images
 		cv::Mat out_image;
@@ -757,19 +766,27 @@ void testHomographyFitting(
 	// This part is not necessary and is only for visualization purposes. 
 	if (draw_results_)
 	{
+		MostSimilarInlierSelector< magsac::utils::DefaultHomographyEstimator> 
+			inlierSelector(estimator.sampleSize() + 1,
+				maximum_threshold_);
+
+		std::vector<size_t> selectedInliers;
+		double bestThreshold;
+		inlierSelector.selectInliers(points,
+			estimator,
+			model,
+			selectedInliers,
+			bestThreshold);
+
+		printf("\t%d inliers are selected adaptively.\n\tThe best threshold is = %f.\n",
+			selectedInliers.size(),
+			bestThreshold);
+
 		// The labeling implied by the estimated model and the drawing threshold
 		std::vector<int> obtained_labeling(points.rows, 0);
 
-		for (size_t point_idx = 0; point_idx < points.rows; ++point_idx)
-		{
-			// Computing the residual of the point given the estimated model
-			auto residual = sqrt(estimator.residual(points.row(point_idx),
-				model));
-			
-			// Change the label to 'inlier' if the residual is smaller than the threshold
-			if (drawing_threshold_ >= residual)
-				obtained_labeling[point_idx] = 1;
-		}
+		for (const auto& inlierIdx : selectedInliers)
+			obtained_labeling[inlierIdx] = 1;
 
 		cv::Mat out_image;
 		
