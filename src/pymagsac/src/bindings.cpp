@@ -7,6 +7,78 @@
 
 namespace py = pybind11;
 
+py::tuple adaptiveInlierSelection(
+    py::array_t<double>  x1y1_,
+    py::array_t<double>  x2y2_,
+    py::array_t<double>  modelParameters_,
+    double maximumThreshold_,
+    int problemType_,
+    int minimumInlierNumber_) 
+{
+    if (problemType_ < 0 || problemType_ > 2)
+        throw std::invalid_argument("Variable 'problemType' should be in interval [0,2]");
+
+    py::buffer_info buf1 = x1y1_.request();
+    size_t NUM_TENTS = buf1.shape[0];
+    size_t DIM = buf1.shape[1];
+
+    if (DIM != 2) {
+        throw std::invalid_argument("x1y1 should be an array with dims [n,2]");
+    }
+
+    py::buffer_info buf1a = x2y2_.request();
+    size_t NUM_TENTSa = buf1a.shape[0];
+    size_t DIMa = buf1a.shape[1];
+
+    if (DIMa != 2) {
+        throw std::invalid_argument("x2y2 should be an array with dims [n,2]");
+    }
+
+    if (NUM_TENTSa != NUM_TENTS) {
+        throw std::invalid_argument("x1y1 and x2y2 should be the same size");
+    }
+
+    py::buffer_info bufModel = modelParameters_.request();
+    size_t DIMModelX = bufModel.shape[0];
+    size_t DIMModelY = bufModel.shape[1];
+
+    if (DIMModelX != 3 || DIMModelY != 3)
+        throw std::invalid_argument("The model should be a 3*3 matrix.");
+
+    double* ptr1 = (double*)buf1.ptr;
+    std::vector<double> x1y1;
+    x1y1.assign(ptr1, ptr1 + buf1.size);
+
+    double* ptr1a = (double*)buf1a.ptr;
+    std::vector<double> x2y2;
+    x2y2.assign(ptr1a, ptr1a + buf1a.size);
+
+    double* ptrModel = (double*)bufModel.ptr;
+    std::vector<double> modelParameters;
+    modelParameters.assign(ptrModel, ptrModel + bufModel.size);
+
+    std::vector<bool> inliers(NUM_TENTS);
+    double bestThreshold;
+
+    int inlierNumber = adaptiveInlierSelection_(
+        x1y1,
+        x2y2,
+        modelParameters,
+        inliers,
+        bestThreshold,
+        problemType_,
+        maximumThreshold_,
+        minimumInlierNumber_);
+
+    py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
+    py::buffer_info bufInliers = inliers_.request();
+    bool* ptrInliers = (bool*)bufInliers.ptr;
+    for (size_t i = 0; i < NUM_TENTS; i++)
+        ptrInliers[i] = inliers[i];
+
+    return py::make_tuple(inliers_, inlierNumber, bestThreshold);
+
+}
 
 py::tuple findFundamentalMatrix(py::array_t<double>  x1y1_,
     py::array_t<double>  x2y2_,
@@ -242,8 +314,17 @@ PYBIND11_PLUGIN(pymagsac) {
            findEssentialMatrix,
            findFundamentalMatrix,
            findHomography,
-
+           adaptiveInlierSelection
+    
     )doc");
+
+    m.def("adaptiveInlierSelection", &adaptiveInlierSelection, R"doc(some doc)doc",
+        py::arg("x1y1"),
+        py::arg("x2y2"),
+        py::arg("modelParameters"),
+        py::arg("maximumThreshold"),
+        py::arg("problemType"),
+        py::arg("minimumInlierNumber") = 20);
 
     m.def("findEssentialMatrix", &findEssentialMatrix, R"doc(some doc)doc",
         py::arg("x1y1"),

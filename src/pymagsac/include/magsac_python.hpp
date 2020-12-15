@@ -2,7 +2,15 @@
 #include <vector>
 #include <opencv2/core/core.hpp>
 
-
+int adaptiveInlierSelection_(
+    const std::vector<double>& srcPts_,
+    const std::vector<double>& dstPts_,
+    const std::vector<double>& model_,
+    std::vector<bool>& inliers_,
+    double& bestThreshold_,
+    int problemType_,
+    double maximumThreshold_,
+    int minimumInlierNumber_);
 
 int findFundamentalMatrix_(std::vector<double>& srcPts,
                            std::vector<double>& dstPts,

@@ -6,9 +6,8 @@
 #include "model.h"
 #include "utils.h"
 #include "estimators.h"
+#include "most_similar_inlier_selector.h"
 #include <thread>
-
-
 
 int findFundamentalMatrix_(std::vector<double>& srcPts,
     std::vector<double>& dstPts,
@@ -268,4 +267,114 @@ int findHomography_(std::vector<double>& srcPts,
         }
     }
     return num_inliers;
+}
+
+int adaptiveInlierSelection_(
+    const std::vector<double>& srcPts_,
+    const std::vector<double>& dstPts_,
+    const std::vector<double>& model_,
+    std::vector<bool>& inliers_,
+    double &bestThreshold_,
+    int problemType_,
+    double maximumThreshold_,
+    int minimumInlierNumber_)
+{
+    if (problemType_ > 2)
+    {
+        printf("The valid settings for variable 'problemType' are\n\t 0 (homography)\n\t 1 (fundamental matrix) \n\t 2 (essential matrix)\n");
+        return 0;
+    }
+
+    int num_tents = srcPts_.size() / 2;
+    cv::Mat points(num_tents, 4, CV_64F);
+    for (int i = 0; i < num_tents; ++i) {
+        points.at<double>(i, 0) = srcPts_[2 * i];
+        points.at<double>(i, 1) = srcPts_[2 * i + 1];
+        points.at<double>(i, 2) = dstPts_[2 * i];
+        points.at<double>(i, 3) = dstPts_[2 * i + 1];
+    }
+
+    std::vector<size_t> selectedInliers;
+    double bestThreshold;
+
+    if (problemType_ == 0)
+    {
+        gcransac::Model model;
+        model.descriptor.resize(3, 3);
+        for (size_t r = 0; r < 3; ++r)
+            for (size_t c = 0; c < 3; ++c)
+                model.descriptor(r, c) = model_[3 * r + c];
+
+        MostSimilarInlierSelector<magsac::utils::DefaultHomographyEstimator>
+            inlierSelector(
+                MAX(magsac::utils::DefaultHomographyEstimator::sampleSize() + 1, minimumInlierNumber_),
+                maximumThreshold_);
+
+        // The robust homography estimator class containing the function for the fitting and residual calculation
+        magsac::utils::DefaultHomographyEstimator homographyEstimator;
+
+        inlierSelector.selectInliers(points,
+            homographyEstimator,
+            model,
+            selectedInliers,
+            bestThreshold_);
+    }
+    else if (problemType_ == 1)
+    {
+        gcransac::Model model;
+        model.descriptor.resize(3, 3);
+        for (size_t r = 0; r < 3; ++r)
+            for (size_t c = 0; c < 3; ++c)
+                model.descriptor(r, c) = model_[3 * r + c];
+
+        MostSimilarInlierSelector<magsac::utils::DefaultFundamentalMatrixEstimator>
+            inlierSelector(
+                MAX(magsac::utils::DefaultFundamentalMatrixEstimator::sampleSize() + 1, minimumInlierNumber_),
+                maximumThreshold_);
+
+        // The robust fundamental matrix estimator class containing the function for the fitting and residual calculation
+        magsac::utils::DefaultFundamentalMatrixEstimator fundamentalEstimator(maximumThreshold_);
+
+        inlierSelector.selectInliers(points,
+            fundamentalEstimator,
+            model,
+            selectedInliers,
+            bestThreshold_);
+    }
+    else
+    {
+        printf("Note: for essential matrices, the correspondences should be normalized by the intrinsic camera matrices.\n");
+
+        gcransac::Model model;
+        model.descriptor.resize(3, 3);
+        for (size_t r = 0; r < 3; ++r)
+            for (size_t c = 0; c < 3; ++c)
+                model.descriptor(r, c) = model_[3 * r + c];
+
+        MostSimilarInlierSelector<magsac::utils::DefaultEssentialMatrixEstimator>
+            inlierSelector(
+                MAX(magsac::utils::DefaultEssentialMatrixEstimator::sampleSize() + 1, minimumInlierNumber_),
+                maximumThreshold_);
+
+        // The robust essential matrix estimator class containing the function for the fitting and residual calculation
+        magsac::utils::DefaultEssentialMatrixEstimator essentialEstimator(
+            Eigen::Matrix3d::Identity(),
+            Eigen::Matrix3d::Identity());
+
+        inlierSelector.selectInliers(points,
+            essentialEstimator,
+            model,
+            selectedInliers,
+            bestThreshold_);
+    }
+
+    inliers_.resize(num_tents);
+
+    for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx)
+        inliers_[pt_idx] = false;
+   
+    for (const auto& inlierIdx : selectedInliers)
+        inliers_[inlierIdx] = true;
+
+    return selectedInliers.size();
 }
