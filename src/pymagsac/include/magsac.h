@@ -14,6 +14,9 @@
 	#include <ppl.h>
 #endif
 
+#include <gflags/gflags.h>
+#include <glog/logging.h>
+
 template <class DatumType, class ModelEstimator>
 class MAGSAC  
 {
@@ -97,7 +100,7 @@ public:
 	void setCoreNumber(size_t core_number_)
 	{
 		if (magsac_version == MAGSAC_PLUS_PLUS)
-			fprintf(stderr, "Setting the core number for MAGSAC++ is deprecated.\n");
+			LOG(ERROR) << "Setting the core number for MAGSAC++ is deprecated.";
 		core_number = core_number_;
 	}
 
@@ -106,7 +109,7 @@ public:
 	void setPartitionNumber(size_t partition_number_)
 	{
 		if (magsac_version == MAGSAC_PLUS_PLUS)
-			fprintf(stderr, "Setting the partition number for MAGSAC++ is deprecated.\n");
+			LOG(ERROR) << "Setting the partition number for MAGSAC++ is deprecated.";
 		partition_number = partition_number_;
 	}
 
@@ -208,8 +211,11 @@ bool MAGSAC<DatumType, ModelEstimator>::run(
 	
 	if (points_.rows < sample_size)
 	{	
-		fprintf(stderr, "There are not enough points for applying robust estimation. Minimum is %d; while %d are given.\n", 
-			sample_size, points_.rows);
+		LOG(WARNING) << "There are not enough points for applying robust estimation. Minimum is "
+			<< static_cast<int>(sample_size) 
+			<< "; while " 
+			<< static_cast<int>(points_.rows) 
+			<< " are given.";
 		return false;
 	}
 
@@ -326,7 +332,7 @@ bool MAGSAC<DatumType, ModelEstimator>::postProcessing(
 	ModelScore &refined_score_,
 	const ModelEstimator &estimator_)
 {
-	fprintf(stderr, "Sigma-consensus++ is not implemented yet as post-processing.\n");
+	LOG(WARNING) << "Sigma-consensus++ is not implemented yet as post-processing.";
 	return false;
 }
 
@@ -495,7 +501,7 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensus(
 		}
 	}
 #else
-	fprintf(stderr, "Not implemented yet.\n");
+	LOG(ERROR) << "Not implemented yet.";
 #endif
 
 	// The weights used for the final weighted least-squares fitting

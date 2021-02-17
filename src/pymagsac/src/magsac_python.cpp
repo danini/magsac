@@ -9,6 +9,9 @@
 #include "most_similar_inlier_selector.h"
 #include <thread>
 
+#include <gflags/gflags.h>
+#include <glog/logging.h>
+
 int findFundamentalMatrix_(std::vector<double>& srcPts,
     std::vector<double>& dstPts,
     std::vector<bool>& inliers,
@@ -281,7 +284,7 @@ int adaptiveInlierSelection_(
 {
     if (problemType_ > 2)
     {
-        printf("The valid settings for variable 'problemType' are\n\t 0 (homography)\n\t 1 (fundamental matrix) \n\t 2 (essential matrix)\n");
+        LOG(ERROR) << "The valid settings for variable 'problemType' are\n\t 0 (homography)\n\t 1 (fundamental matrix) \n\t 2 (essential matrix)\n";
         return 0;
     }
 
@@ -343,7 +346,7 @@ int adaptiveInlierSelection_(
     }
     else
     {
-        printf("Note: for essential matrices, the correspondences should be normalized by the intrinsic camera matrices.\n");
+        LOG(INFO) << "Note: for essential matrices, the correspondences should be normalized by the intrinsic camera matrices.";
 
         gcransac::Model model;
         model.descriptor.resize(3, 3);
