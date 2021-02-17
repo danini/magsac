@@ -7,6 +7,7 @@
 #include "utils.h"
 #include "estimators.h"
 #include "most_similar_inlier_selector.h"
+#include "progressive_napsac_sampler.h"
 #include <thread>
 
 #include <gflags/gflags.h>
@@ -16,6 +17,10 @@ int findFundamentalMatrix_(std::vector<double>& srcPts,
     std::vector<double>& dstPts,
     std::vector<bool>& inliers,
     std::vector<double>& F,
+    double sourceImageWidth,
+    double sourceImageHeight,
+    double destinationImageWidth,
+    double destinationImageHeight,
     bool use_magsac_plus_plus,
     double sigma_max,
     double conf,
@@ -45,7 +50,17 @@ int findFundamentalMatrix_(std::vector<double>& srcPts,
         points.at<double>(i, 2) = dstPts[2 * i];
         points.at<double>(i, 3) = dstPts[2 * i + 1];
     }
-    gcransac::sampler::UniformSampler main_sampler(&points);
+	
+	// Initialize the sampler used for selecting minimal samples
+	gcransac::sampler::ProgressiveNapsacSampler<4> main_sampler(&points,
+		{ 16, 8, 4, 2 },	// The layer of grids. The cells of the finest grid are of dimension 
+							// (source_image_width / 16) * (source_image_height / 16)  * (destination_image_width / 16)  (destination_image_height / 16), etc.
+		estimator.sampleSize(), // The size of a minimal sample
+		{ static_cast<double>(sourceImageWidth), // The width of the source image
+			static_cast<double>(sourceImageHeight), // The height of the source image
+			static_cast<double>(destinationImageWidth), // The width of the destination image
+			static_cast<double>(destinationImageHeight) },  // The height of the destination image
+		0.5); // The length (i.e., 0.5 * <point number> iterations) of fully blending to global sampling 
 
     ModelScore score;
     bool success = magsac->run(points, // The data points
@@ -90,6 +105,10 @@ int findEssentialMatrix_(std::vector<double>& srcPts,
     std::vector<double>& E,
     std::vector<double>& src_K,
     std::vector<double>& dst_K,
+    double sourceImageWidth,
+    double sourceImageHeight,
+    double destinationImageWidth,
+    double destinationImageHeight,
     bool use_magsac_plus_plus,
     double sigma_max,
     double conf,
@@ -151,8 +170,17 @@ int findEssentialMatrix_(std::vector<double>& srcPts,
     magsac.setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
     magsac.setIterationLimit(max_iters);
     magsac.setReferenceThreshold(magsac.getReferenceThreshold() / threshold_normalizer); // The reference threshold inside MAGSAC++ should also be normalized.
-
-    gcransac::sampler::UniformSampler main_sampler(&points);
+	
+	// Initialize the sampler used for selecting minimal samples
+	gcransac::sampler::ProgressiveNapsacSampler<4> main_sampler(&points,
+		{ 16, 8, 4, 2 },	// The layer of grids. The cells of the finest grid are of dimension 
+							// (source_image_width / 16) * (source_image_height / 16)  * (destination_image_width / 16)  (destination_image_height / 16), etc.
+		estimator.sampleSize(), // The size of a minimal sample
+		{ static_cast<double>(sourceImageWidth), // The width of the source image
+			static_cast<double>(sourceImageHeight), // The height of the source image
+			static_cast<double>(destinationImageWidth), // The width of the destination image
+			static_cast<double>(destinationImageHeight) },  // The height of the destination image
+		0.5); // The length (i.e., 0.5 * <point number> iterations) of fully blending to global sampling 
 
     ModelScore score;
     bool success = magsac.run(normalized_points, // The data points
@@ -199,6 +227,10 @@ int findHomography_(std::vector<double>& srcPts,
                     std::vector<double>& dstPts,
                     std::vector<bool>& inliers,
                     std::vector<double>& H,
+                    double sourceImageWidth,
+                    double sourceImageHeight,
+                    double destinationImageWidth,
+                    double destinationImageHeight,
 					bool use_magsac_plus_plus,
                     double sigma_max,
                     double conf,
@@ -232,7 +264,17 @@ int findHomography_(std::vector<double>& srcPts,
         points.at<double>(i, 2) = dstPts[2*i];
         points.at<double>(i, 3) = dstPts[2*i + 1];
     }
-    gcransac::sampler::UniformSampler main_sampler(&points);
+	
+	// Initialize the sampler used for selecting minimal samples
+	gcransac::sampler::ProgressiveNapsacSampler<4> main_sampler(&points,
+		{ 16, 8, 4, 2 },	// The layer of grids. The cells of the finest grid are of dimension 
+							// (source_image_width / 16) * (source_image_height / 16)  * (destination_image_width / 16)  (destination_image_height / 16), etc.
+		estimator.sampleSize(), // The size of a minimal sample
+		{ static_cast<double>(sourceImageWidth), // The width of the source image
+			static_cast<double>(sourceImageHeight), // The height of the source image
+			static_cast<double>(destinationImageWidth), // The width of the destination image
+			static_cast<double>(destinationImageHeight) },  // The height of the destination image
+		0.5); // The length (i.e., 0.5 * <point number> iterations) of fully blending to global sampling 
 
     bool success = magsac->run(points, // The data points
                               conf, // The required confidence in the results

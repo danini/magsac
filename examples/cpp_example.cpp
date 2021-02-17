@@ -17,6 +17,7 @@
 #include "magsac.h"
 #include "most_similar_inlier_selector.h"
 
+#include "progressive_napsac_sampler.h"
 #include "uniform_sampler.h"
 #include "flann_neighborhood_graph.h"
 #include "fundamental_estimator.h"
@@ -452,7 +453,15 @@ void testEssentialMatrixFitting(
 	LOG(INFO) << "Number of correspondences loaded = " << static_cast<int>(N);
 	
 	// Initialize the sampler used for selecting minimal samples
-	gcransac::sampler::UniformSampler main_sampler(&normalized_points);
+	gcransac::sampler::ProgressiveNapsacSampler<4> main_sampler(&points,
+		{ 16, 8, 4, 2 },	// The layer of grids. The cells of the finest grid are of dimension 
+							// (source_image_width / 16) * (source_image_height / 16)  * (destination_image_width / 16)  (destination_image_height / 16), etc.
+		estimator.sampleSize(), // The size of a minimal sample
+		{ static_cast<double>(image1.cols), // The width of the source image
+			static_cast<double>(image1.rows), // The height of the source image
+			static_cast<double>(image2.cols), // The width of the destination image
+			static_cast<double>(image2.rows) },  // The height of the destination image
+		0.5); // The length (i.e., 0.5 * <point number> iterations) of fully blending to global sampling 
 
 	MAGSAC<cv::Mat, magsac::utils::DefaultEssentialMatrixEstimator> magsac
 		(use_magsac_plus_plus_ ? 
@@ -593,8 +602,16 @@ void testFundamentalMatrixFitting(
 	LOG(INFO) << "Theoretical RANSAC iteration number at " << ransac_confidence_ << " confidence = " <<
 		static_cast<int>(log(1.0 - ransac_confidence_) / log(1.0 - pow(static_cast<double>(inlier_number) / static_cast<double>(N), 7)));
 
-	// Initialize the sampler used for selecting minimal samples
-	gcransac::sampler::UniformSampler main_sampler(&points);
+	// Initialize the sampler used for selecting minimal samples	
+	gcransac::sampler::ProgressiveNapsacSampler<4> main_sampler(&points,
+		{ 16, 8, 4, 2 },	// The layer of grids. The cells of the finest grid are of dimension 
+							// (source_image_width / 16) * (source_image_height / 16)  * (destination_image_width / 16)  (destination_image_height / 16), etc.
+		estimator.sampleSize(), // The size of a minimal sample
+		{ static_cast<double>(image1.cols), // The width of the source image
+			static_cast<double>(image1.rows), // The height of the source image
+			static_cast<double>(image2.cols), // The width of the destination image
+			static_cast<double>(image2.rows) },  // The height of the destination image
+		0.5); // The length (i.e., 0.5 * <point number> iterations) of fully blending to global sampling 
 	 
 	MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator> magsac
 		(use_magsac_plus_plus_ ?
@@ -754,7 +771,15 @@ void testHomographyFitting(
 		static_cast<int>(log(1.0 - ransac_confidence_) / log(1.0 - pow(static_cast<double>(reference_inlier_number) / static_cast<double>(point_number), 4)));
 
 	// Initialize the sampler used for selecting minimal samples
-	gcransac::sampler::UniformSampler main_sampler(&points);
+	gcransac::sampler::ProgressiveNapsacSampler<4> main_sampler(&points,
+		{ 16, 8, 4, 2 },	// The layer of grids. The cells of the finest grid are of dimension 
+							// (source_image_width / 16) * (source_image_height / 16)  * (destination_image_width / 16)  (destination_image_height / 16), etc.
+		estimator.sampleSize(), // The size of a minimal sample
+		{ static_cast<double>(image1.cols), // The width of the source image
+			static_cast<double>(image1.rows), // The height of the source image
+			static_cast<double>(image2.cols), // The width of the destination image
+			static_cast<double>(image2.rows) },  // The height of the destination image
+		0.5); // The length (i.e., 0.5 * <point number> iterations) of fully blending to global sampling 
 
 	MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator> magsac
 		(use_magsac_plus_plus_ ?
