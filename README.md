@@ -75,6 +75,8 @@ The example for essential matrix fitting is available at: [notebook](examples/ex
 - CMake 2.8.12 or higher
 - OpenCV 3.0 or higher
 - A modern compiler with C++17 support
+- GFlags
+- GLOG
 
 # Performance of MAGSAC++
 
