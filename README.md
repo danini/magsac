@@ -69,6 +69,20 @@ The example for fundamental matrix fitting is available at: [notebook](examples/
 
 The example for essential matrix fitting is available at: [notebook](examples/example_essential_matrix.ipynb).
 
+# Docker example
+
+Build the image with:
+
+```bash
+docker build -t magsac - < examples/Dockerfile
+```
+
+Verify that `pymagsac` is importable:
+
+```
+docker run --rm -it magsac python -c "import pymagsac; print('Done!')"
+```
+
 # Requirements
 
 - Eigen 3.0 or higher
