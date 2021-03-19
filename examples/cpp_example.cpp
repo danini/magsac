@@ -113,12 +113,12 @@ int main(int argc, char** argv)
 	// Initialize Google's logging library.
 	google::InitGoogleLogging(argv[0]);
 
-	printf("If you want to see the details of the fitting, e.g., time or estimation quality, turn off logging by starting the application as 'GLOG_logtostderr=1 ./SampleProject' or by using flag '--logtostderr=1'\n");
+	printf("If you want to see the details of the fitting, e.g., time or estimation quality, turn on logging by starting the application as 'GLOG_logtostderr=1 ./SampleProject' or by using flag '--logtostderr=1'\n");
 	printf("Accepted flags:"); 
 	printf("\n\t--problem-type {0,1,2} - The example problem which should run. Values: (0) Homography estimation, (1) Fundamental matrix estimation, (2) Essential matrix estimation. Default: 0");
 	printf("\n\t--draw-results {0,1} - A flag determining if the results should be drawn and visualized. Default: 1");
 	fflush(stdout);
-
+	 
 	/*
 		This is an example showing how MAGSAC or MAGSAC++ is applied to homography or fundamental matrix estimation tasks.
 		This implementation is not the one used in the experiments of the paper.
