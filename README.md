@@ -1,3 +1,8 @@
+# Important news
+
+I am happy to announce that MAGSAC++ had been included in OpenCV.
+You can check the documentation at [link](https://docs.opencv.org/4.5.2/d1/df1/md__build_master-contrib_docs-lin64_opencv_doc_tutorials_calib3d_usac.html).
+
 # The MAGSAC and MAGSAC++ algorithms for robust model fitting without using a single inlier-outlier threshold
 
 The MAGSAC and MAGSAC++ algorithms proposed for robust model estimation without a single inlier-outlier threshold.
