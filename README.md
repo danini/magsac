@@ -2,7 +2,7 @@
 
 I am happy to announce that MAGSAC++ had been included in OpenCV.
 You can check the documentation at [link](https://docs.opencv.org/4.5.2/d1/df1/md__build_master-contrib_docs-lin64_opencv_doc_tutorials_calib3d_usac.html).
-A comparison of OpenCV MAGSAC++ with the other robust estimators is at [link]{https://opencv.org/evaluating-opencvs-new-ransacs/} thanks to Dmytro Mishkin. 
+A comparison of OpenCV MAGSAC++ with the other robust estimators is at [link](https://opencv.org/evaluating-opencvs-new-ransacs/) thanks to Dmytro Mishkin. 
 
 ![OpenCV USAC Benchmark](https://opencv.org/wp-content/uploads/2021/06/1-1024x530.png)
 
