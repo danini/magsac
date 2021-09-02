@@ -524,7 +524,7 @@ namespace magsac
 	{
 		// The default estimator for essential matrix fitting
 		typedef estimator::EssentialMatrixEstimator<gcransac::estimator::solver::EssentialMatrixFivePointSteweniusSolver, // The solver used for fitting a model to a minimal sample
-			gcransac::estimator::solver::EssentialMatrixFivePointSteweniusSolver> // The solver used for fitting a model to a non-minimal sample
+			gcransac::estimator::solver::EssentialMatrixBundleAdjustmentSolver> // The solver used for fitting a model to a non-minimal sample
 			DefaultEssentialMatrixEstimator;
 
 		// The default estimator for fundamental matrix fitting
