@@ -5,8 +5,8 @@
 #include <memory>
 #include "model.h"
 #include "model_score.h"
-#include "sampler.h"
-#include "uniform_sampler.h"
+#include "samplers/sampler.h"
+#include "samplers/uniform_sampler.h"
 #include <math.h> 
 #include "gamma_values.cpp"
 

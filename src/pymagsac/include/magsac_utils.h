@@ -5,7 +5,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
 
-#include "estimator.h"
+#include "estimators/estimator.h"
 #include "model.h"
 
 #include <vector>

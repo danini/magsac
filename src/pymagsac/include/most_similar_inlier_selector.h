@@ -1,6 +1,6 @@
 #pragma once
 
-#include "estimator.h"
+#include "estimators/estimator.h"
 #include "model.h"
 #include "adaptive_inlier_selector.h"
 

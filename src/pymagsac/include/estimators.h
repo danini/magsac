@@ -1,8 +1,8 @@
 #pragma once
 
-#include "essential_estimator.h"
-#include "fundamental_estimator.h"
-#include "homography_estimator.h"
+#include "estimators/essential_estimator.h"
+#include "estimators/fundamental_estimator.h"
+#include "estimators/homography_estimator.h"
 #include "model.h"
 
 namespace magsac
