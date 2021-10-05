@@ -41,6 +41,7 @@ public:
 		last_iteration_number(0),
 		log_confidence(0),
 		point_number(0),
+		save_samples(false),
 		magsac_version(magsac_version_)
 	{ 
 	}
@@ -63,6 +64,11 @@ public:
 		maximum_threshold = maximum_threshold_;
 	}
 
+	void setSampleSavingFlag(const bool save_samples_)
+	{
+		save_samples = save_samples_;	
+	}
+
 	// A function to set the inlier-outlier threshold used for speeding up the procedure
 	// and for determining the required number of iterations.
 	void setReferenceThreshold(const double threshold_)
@@ -73,6 +79,16 @@ public:
 	double getReferenceThreshold()
 	{
 		return interrupting_threshold;
+	}
+
+	const std::vector<std::vector<size_t>> &getMinimalSamples() const
+	{
+		return minimal_samples;
+	}
+
+	std::vector<std::vector<size_t>> &getMutableMinimalSamples()
+	{
+		return minimal_samples;
 	}
 
 	// Setting the flag determining if post-processing is needed
@@ -99,8 +115,8 @@ public:
 	// Otherwise, the threads will act weirdly.
 	void setCoreNumber(size_t core_number_)
 	{
-		if (magsac_version == MAGSAC_PLUS_PLUS)
-			LOG(ERROR) << "Setting the core number for MAGSAC++ is deprecated.";
+		//if (magsac_version == MAGSAC_PLUS_PLUS)
+		//	LOG(INFO) << "Setting the core number for MAGSAC++ is deprecated.";
 		core_number = core_number_;
 	}
 
@@ -108,8 +124,8 @@ public:
 	// to speed up the procedure. In MAGSAC++, this parameter is not used.
 	void setPartitionNumber(size_t partition_number_)
 	{
-		if (magsac_version == MAGSAC_PLUS_PLUS)
-			LOG(ERROR) << "Setting the partition number for MAGSAC++ is deprecated.";
+		//if (magsac_version == MAGSAC_PLUS_PLUS)
+		//	LOG(INFO) << "Setting the partition number for MAGSAC++ is deprecated.";
 		partition_number = partition_number_;
 	}
 
@@ -165,6 +181,9 @@ protected:
 	double log_confidence; // The logarithm of the required confidence
 	size_t partition_number; // Number of partitions used to speed up sigma-consensus
 	double interrupting_threshold; // A threshold to speed up MAGSAC by interrupting the sigma-consensus procedure whenever there is no chance of being better than the previous so-far-the-best model
+	
+	bool save_samples;
+	std::vector<std::vector<size_t>> minimal_samples;
 
 	bool sigmaConsensus(
 		const cv::Mat& points_,
@@ -225,6 +244,10 @@ bool MAGSAC<DatumType, ModelEstimator>::run(
 
 	constexpr size_t max_unsuccessful_model_generations = 50;
 
+	// Save the minimal samples if needed that can be used for training
+	if (save_samples)
+		minimal_samples.reserve(max_iteration);
+
 	// Main MAGSAC iteration
 	while (mininum_iteration_number > iteration ||
 		iteration < max_iteration)
@@ -256,6 +279,14 @@ bool MAGSAC<DatumType, ModelEstimator>::run(
 				&models)) // The estimated models
 				break; 
 		}         
+
+		// Saving the minimal sample if needed
+		if (save_samples)
+		{
+			minimal_samples.emplace_back(std::vector<size_t>(5));
+			for (size_t sample_idx = 0; sample_idx < sample_size; ++sample_idx)
+				minimal_samples.back()[sample_idx] = minimal_sample[sample_idx];
+		}
 
 		// If the method was not able to generate any usable models, break the cycle.
 		iteration += unsuccessful_model_generations - 1;

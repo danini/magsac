@@ -164,7 +164,9 @@ py::tuple findEssentialMatrix(py::array_t<double>  x1y1_,
     double sigma_th,
     double conf,
     int max_iters,
-    int partition_num) {
+    int partition_num,
+    bool save_samples) 
+{
     py::buffer_info buf1 = x1y1_.request();
     size_t NUM_TENTS = buf1.shape[0];
     size_t DIM = buf1.shape[1];
@@ -218,6 +220,7 @@ py::tuple findEssentialMatrix(py::array_t<double>  x1y1_,
 
     std::vector<double> E(9);
     std::vector<bool> inliers(NUM_TENTS);
+    std::vector<size_t> minimal_samples;
 
     int num_inl = findEssentialMatrix_(x1y1,
         x2y2,
@@ -225,6 +228,7 @@ py::tuple findEssentialMatrix(py::array_t<double>  x1y1_,
         E, 
         K1, 
         K2,
+        minimal_samples,
         w1,
         h1,
         w2,
@@ -233,7 +237,8 @@ py::tuple findEssentialMatrix(py::array_t<double>  x1y1_,
         sigma_th,
         conf,
         max_iters,
-        partition_num);
+        partition_num,
+        save_samples);
 
     py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
     py::buffer_info buf3 = inliers_.request();
@@ -242,7 +247,7 @@ py::tuple findEssentialMatrix(py::array_t<double>  x1y1_,
         ptr3[i] = inliers[i];
 
     if (num_inl == 0) {
-        return py::make_tuple(pybind11::cast<pybind11::none>(Py_None), inliers_);
+        return py::make_tuple(pybind11::cast<pybind11::none>(Py_None), inliers_, pybind11::cast<pybind11::none>(Py_None));
     }
 
     py::array_t<double> E_ = py::array_t<double>({ 3,3 });
@@ -250,7 +255,21 @@ py::tuple findEssentialMatrix(py::array_t<double>  x1y1_,
     double* ptr2 = (double*)buf2.ptr;
     for (size_t i = 0; i < 9; i++)
         ptr2[i] = E[i];
-    return py::make_tuple(E_, inliers_);
+    
+    if (save_samples)
+    {
+        const size_t sample_number = minimal_samples.size() / 5;
+
+        py::array_t<int> minimal_samples_ = py::array_t<int>({ sample_number, 5 });
+        py::buffer_info buffer_samples = minimal_samples_.request();
+        int* ptr_samples = (int*)buffer_samples.ptr;
+        for (size_t i = 0; i < minimal_samples.size(); i++)
+            ptr_samples[i] = minimal_samples[i];
+            
+        return py::make_tuple(E_, inliers_, minimal_samples_);
+    }
+    
+    return py::make_tuple(E_, inliers_, pybind11::cast<pybind11::none>(Py_None));
 }
                                 
 py::tuple findHomography(py::array_t<double>  x1y1_,
@@ -363,7 +382,8 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("sigma_th") = 1.0,
         py::arg("conf") = 0.99,
         py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5);
+        py::arg("partition_num") = 5,
+        py::arg("save_samples") = false);
 
     m.def("findFundamentalMatrix", &findFundamentalMatrix, R"doc(some doc)doc",
         py::arg("x1y1"),

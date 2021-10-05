@@ -1,13 +1,15 @@
 #include "magsac_python.hpp"
 #include "magsac.h"
-#include "fundamental_estimator.h"
-#include "homography_estimator.h"
+#include "estimators/fundamental_estimator.h"
+#include "estimators/homography_estimator.h"
 #include "types.h"
 #include "model.h"
 #include "utils.h"
 #include "estimators.h"
 #include "most_similar_inlier_selector.h"
-#include "progressive_napsac_sampler.h"
+#include "samplers/progressive_napsac_sampler.h"
+#include "samplers/uniform_sampler.h"
+#include "samplers/prosac_sampler.h"
 #include <thread>
 
 #include <gflags/gflags.h>
@@ -105,6 +107,7 @@ int findEssentialMatrix_(std::vector<double>& srcPts,
     std::vector<double>& E,
     std::vector<double>& src_K,
     std::vector<double>& dst_K,
+    std::vector<size_t> &minimal_samples,
     double sourceImageWidth,
     double sourceImageHeight,
     double destinationImageWidth,
@@ -113,7 +116,8 @@ int findEssentialMatrix_(std::vector<double>& srcPts,
     double sigma_max,
     double conf,
     int max_iters,
-    int partition_num)
+    int partition_num,
+    bool save_minimal_samples)
 {
     int num_tents = srcPts.size() / 2;
     cv::Mat points(num_tents, 4, CV_64F);
@@ -165,32 +169,32 @@ int findEssentialMatrix_(std::vector<double>& srcPts,
             MAGSAC<cv::Mat, magsac::utils::DefaultEssentialMatrixEstimator>::MAGSAC_PLUS_PLUS : 
             MAGSAC<cv::Mat, magsac::utils::DefaultEssentialMatrixEstimator>::MAGSAC_ORIGINAL);
 
+    // Set the corresponding flag if the samples should be saved
+    if (save_minimal_samples)
+        magsac.setSampleSavingFlag(save_minimal_samples);
+
     magsac.setMaximumThreshold(normalized_sigma_max); // The maximum noise scale sigma allowed
     magsac.setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac.setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
     magsac.setIterationLimit(max_iters);
     magsac.setReferenceThreshold(magsac.getReferenceThreshold() / threshold_normalizer); // The reference threshold inside MAGSAC++ should also be normalized.
-	
+    magsac.setMinimumIterationNumber(1000);
+
 	// Initialize the sampler used for selecting minimal samples
-	gcransac::sampler::ProgressiveNapsacSampler<4> main_sampler(&points,
-		{ 16, 8, 4, 2 },	// The layer of grids. The cells of the finest grid are of dimension 
-							// (source_image_width / 16) * (source_image_height / 16)  * (destination_image_width / 16)  (destination_image_height / 16), etc.
-		estimator.sampleSize(), // The size of a minimal sample
-		{ static_cast<double>(sourceImageWidth), // The width of the source image
-			static_cast<double>(sourceImageHeight), // The height of the source image
-			static_cast<double>(destinationImageWidth), // The width of the destination image
-			static_cast<double>(destinationImageHeight) },  // The height of the destination image
-		0.5); // The length (i.e., 0.5 * <point number> iterations) of fully blending to global sampling 
+    gcransac::sampler::ProsacSampler main_sampler(&points, estimator.sampleSize());
 
     ModelScore score;
+    int iteration_number = 0;
     bool success = magsac.run(normalized_points, // The data points
         conf, // The required confidence in the results
         estimator, // The used estimator
         main_sampler, // The sampler used for selecting minimal samples in each iteration
         model, // The estimated model
-        max_iters, // The number of iterations
+        iteration_number, // The number of iterations
         score); // The score of the estimated model
     inliers.resize(num_tents);
+
+    printf("Iterations = %d\n", iteration_number);
 
     if (!success) {
         for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx) {
@@ -203,6 +207,15 @@ int findEssentialMatrix_(std::vector<double>& srcPts,
             }
         }
         return 0;
+    }
+    
+    // Save the samples
+    if (save_minimal_samples)
+    {
+        minimal_samples.reserve(iteration_number * 5);
+        for (const auto &sample : magsac.getMinimalSamples())
+            for (size_t point_idx = 0; point_idx < 5; ++point_idx)
+                minimal_samples.emplace_back(sample[point_idx]);
     }
 
     int num_inliers = 0;
