@@ -44,7 +44,7 @@ int findFundamentalMatrix_(std::vector<double>& srcPts,
 
     // Set the corresponding flag if the samples should be saved
     if (save_minimal_samples)
-        magsac.setSampleSavingFlag(save_minimal_samples);
+        magsac->setSampleSavingFlag(save_minimal_samples);
 
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
@@ -72,12 +72,13 @@ int findFundamentalMatrix_(std::vector<double>& srcPts,
 		0.5); // The length (i.e., 0.5 * <point number> iterations) of fully blending to global sampling 
 
     ModelScore score;
+    int iteration_number = 0;
     bool success = magsac->run(points, // The data points
         conf, // The required confidence in the results
         estimator, // The used estimator
         main_sampler, // The sampler used for selecting minimal samples in each iteration
         model, // The estimated model
-        max_iters, // The number of iterations
+        iteration_number, // The number of iterations
         score); // The score of the estimated model
     inliers.resize(num_tents);
     if (!success) {
@@ -96,9 +97,9 @@ int findFundamentalMatrix_(std::vector<double>& srcPts,
     // Save the samples
     if (save_minimal_samples)
     {
-        minimal_samples.reserve(iteration_number * 5);
+        minimal_samples.reserve(iteration_number * 7);
         for (const auto &sample : magsac->getMinimalSamples())
-            for (size_t point_idx = 0; point_idx < 5; ++point_idx)
+            for (size_t point_idx = 0; point_idx < 7; ++point_idx)
                 minimal_samples.emplace_back(sample[point_idx]);
     }
 
@@ -210,8 +211,6 @@ int findEssentialMatrix_(std::vector<double>& srcPts,
         iteration_number, // The number of iterations
         score); // The score of the estimated model
     inliers.resize(num_tents);
-
-    printf("Iterations = %d\n", iteration_number);
 
     if (!success) {
         for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx) {
