@@ -19,6 +19,7 @@ int findFundamentalMatrix_(std::vector<double>& srcPts,
     std::vector<double>& dstPts,
     std::vector<bool>& inliers,
     std::vector<double>& F,
+    std::vector<size_t> &minimal_samples,
     double sourceImageWidth,
     double sourceImageHeight,
     double destinationImageWidth,
@@ -27,7 +28,8 @@ int findFundamentalMatrix_(std::vector<double>& srcPts,
     double sigma_max,
     double conf,
     int max_iters,
-    int partition_num)
+    int partition_num,
+    bool save_minimal_samples)
 {
     magsac::utils::DefaultFundamentalMatrixEstimator estimator(0.1); // The robust homography estimator class containing the
     gcransac::FundamentalMatrix model; // The estimated model
@@ -39,6 +41,11 @@ int findFundamentalMatrix_(std::vector<double>& srcPts,
     else
         magsac = new MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>(
             MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>::MAGSAC_ORIGINAL);
+
+    // Set the corresponding flag if the samples should be saved
+    if (save_minimal_samples)
+        magsac.setSampleSavingFlag(save_minimal_samples);
+
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
@@ -85,6 +92,16 @@ int findFundamentalMatrix_(std::vector<double>& srcPts,
         }
         return 0;
     }
+    
+    // Save the samples
+    if (save_minimal_samples)
+    {
+        minimal_samples.reserve(iteration_number * 5);
+        for (const auto &sample : magsac->getMinimalSamples())
+            for (size_t point_idx = 0; point_idx < 5; ++point_idx)
+                minimal_samples.emplace_back(sample[point_idx]);
+    }
+
     int num_inliers = 0;
     for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx) {
         const int is_inlier = estimator.residual(points.row(pt_idx), model.descriptor) <= sigma_max;
