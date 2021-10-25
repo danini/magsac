@@ -8,6 +8,7 @@
 #include "estimators.h"
 #include "most_similar_inlier_selector.h"
 #include "samplers/progressive_napsac_sampler.h"
+#include "samplers/importance_sampler.h"
 #include "samplers/uniform_sampler.h"
 #include "samplers/prosac_sampler.h"
 #include <thread>
@@ -20,6 +21,7 @@ int findFundamentalMatrix_(std::vector<double>& srcPts,
     std::vector<bool>& inliers,
     std::vector<double>& F,
     std::vector<size_t> &minimal_samples,
+    std::vector<double> &point_probabilities,
     double sourceImageWidth,
     double sourceImageHeight,
     double destinationImageWidth,
@@ -29,6 +31,7 @@ int findFundamentalMatrix_(std::vector<double>& srcPts,
     double conf,
     int max_iters,
     int partition_num,
+    int sampler_id,
     bool save_minimal_samples)
 {
     magsac::utils::DefaultFundamentalMatrixEstimator estimator(0.1); // The robust homography estimator class containing the
@@ -59,28 +62,51 @@ int findFundamentalMatrix_(std::vector<double>& srcPts,
         points.at<double>(i, 2) = dstPts[2 * i];
         points.at<double>(i, 3) = dstPts[2 * i + 1];
     }
-	
-	// Initialize the sampler used for selecting minimal samples
-	gcransac::sampler::ProgressiveNapsacSampler<4> main_sampler(&points,
-		{ 16, 8, 4, 2 },	// The layer of grids. The cells of the finest grid are of dimension 
-							// (source_image_width / 16) * (source_image_height / 16)  * (destination_image_width / 16)  (destination_image_height / 16), etc.
-		estimator.sampleSize(), // The size of a minimal sample
-		{ static_cast<double>(sourceImageWidth), // The width of the source image
-			static_cast<double>(sourceImageHeight), // The height of the source image
-			static_cast<double>(destinationImageWidth), // The width of the destination image
-			static_cast<double>(destinationImageHeight) },  // The height of the destination image
-		0.5); // The length (i.e., 0.5 * <point number> iterations) of fully blending to global sampling 
+
+	// Initialize the samplers
+	// The main sampler is used for sampling in the main RANSAC loop
+	typedef gcransac::sampler::Sampler<cv::Mat, size_t> AbstractSampler;
+	std::unique_ptr<AbstractSampler> main_sampler;
+	if (sampler_id == 0) // Initializing a RANSAC-like uniformly random sampler
+		main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::UniformSampler(&points));
+	else if (sampler_id == 1)  // Initializing a PROSAC sampler. This requires the points to be ordered according to the quality.
+		main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProsacSampler(&points, estimator.sampleSize()));
+	else if (sampler_id == 2) // Initializing a Progressive NAPSAC sampler
+		main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProgressiveNapsacSampler<4>(&points,
+			{ 16, 8, 4, 2 },	// The layer of grids. The cells of the finest grid are of dimension 
+								// (source_image_width / 16) * (source_image_height / 16)  * (destination_image_width / 16)  (destination_image_height / 16), etc.
+			estimator.sampleSize(), // The size of a minimal sample
+            { static_cast<double>(sourceImageWidth), // The width of the source image
+                static_cast<double>(sourceImageHeight), // The height of the source image
+                static_cast<double>(destinationImageWidth), // The width of the destination image
+                static_cast<double>(destinationImageHeight) },  // The height of the destination image
+			0.5)); // The length (i.e., 0.5 * <point number> iterations) of fully blending to global sampling 
+	else if (sampler_id == 3)
+		main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ImportanceSampler(&points, 
+            point_probabilities,
+            estimator.sampleSize()));
+    else
+	{
+		fprintf(stderr, "Unknown sampler identifier: %d. The accepted samplers are 0 (uniform sampling), 1 (PROSAC sampling), 2 (P-NAPSAC sampling)\n",
+			sampler_id);
+		return 0;
+	}
 
     ModelScore score;
     int iteration_number = 0;
     bool success = magsac->run(points, // The data points
         conf, // The required confidence in the results
         estimator, // The used estimator
-        main_sampler, // The sampler used for selecting minimal samples in each iteration
+        *main_sampler.get(), // The sampler used for selecting minimal samples in each iteration
         model, // The estimated model
         iteration_number, // The number of iterations
         score); // The score of the estimated model
     inliers.resize(num_tents);
+
+    // Delete the sampler
+	AbstractSampler *sampler_ptr = main_sampler.release();
+	delete sampler_ptr;
+
     if (!success) {
         for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx) {
             inliers[pt_idx] = false;
@@ -126,6 +152,7 @@ int findEssentialMatrix_(std::vector<double>& srcPts,
     std::vector<double>& src_K,
     std::vector<double>& dst_K,
     std::vector<size_t> &minimal_samples,
+    std::vector<double> &point_probabilities,
     double sourceImageWidth,
     double sourceImageHeight,
     double destinationImageWidth,
@@ -135,6 +162,7 @@ int findEssentialMatrix_(std::vector<double>& srcPts,
     double conf,
     int max_iters,
     int partition_num,
+    int sampler_id,
     bool save_minimal_samples)
 {
     int num_tents = srcPts.size() / 2;
@@ -199,18 +227,48 @@ int findEssentialMatrix_(std::vector<double>& srcPts,
     magsac.setMinimumIterationNumber(1000);
 
 	// Initialize the sampler used for selecting minimal samples
-    gcransac::sampler::ProsacSampler main_sampler(&points, estimator.sampleSize());
+	// The main sampler is used for sampling in the main RANSAC loop
+	typedef gcransac::sampler::Sampler<cv::Mat, size_t> AbstractSampler;
+	std::unique_ptr<AbstractSampler> main_sampler;
+	if (sampler_id == 0) // Initializing a RANSAC-like uniformly random sampler
+		main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::UniformSampler(&points));
+	else if (sampler_id == 1)  // Initializing a PROSAC sampler. This requires the points to be ordered according to the quality.
+		main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProsacSampler(&points, estimator.sampleSize()));
+	else if (sampler_id == 2) // Initializing a Progressive NAPSAC sampler
+		main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProgressiveNapsacSampler<4>(&points,
+			{ 16, 8, 4, 2 },	// The layer of grids. The cells of the finest grid are of dimension 
+								// (source_image_width / 16) * (source_image_height / 16)  * (destination_image_width / 16)  (destination_image_height / 16), etc.
+			estimator.sampleSize(), // The size of a minimal sample
+            { static_cast<double>(sourceImageWidth), // The width of the source image
+                static_cast<double>(sourceImageHeight), // The height of the source image
+                static_cast<double>(destinationImageWidth), // The width of the destination image
+                static_cast<double>(destinationImageHeight) },  // The height of the destination image
+			0.5)); // The length (i.e., 0.5 * <point number> iterations) of fully blending to global sampling 
+	else if (sampler_id == 3)
+		main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ImportanceSampler(&points, 
+            point_probabilities,
+            estimator.sampleSize()));
+    else
+	{
+		fprintf(stderr, "Unknown sampler identifier: %d. The accepted samplers are 0 (uniform sampling), 1 (PROSAC sampling), 2 (P-NAPSAC sampling)\n",
+			sampler_id);
+		return 0;
+	}
 
     ModelScore score;
     int iteration_number = 0;
     bool success = magsac.run(normalized_points, // The data points
         conf, // The required confidence in the results
         estimator, // The used estimator
-        main_sampler, // The sampler used for selecting minimal samples in each iteration
+        *main_sampler.get(), // The sampler used for selecting minimal samples in each iteration
         model, // The estimated model
         iteration_number, // The number of iterations
         score); // The score of the estimated model
     inliers.resize(num_tents);
+
+    // Delete the sampler
+	AbstractSampler *sampler_ptr = main_sampler.release();
+	delete sampler_ptr;
 
     if (!success) {
         for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx) {

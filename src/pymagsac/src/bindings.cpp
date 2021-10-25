@@ -86,11 +86,13 @@ py::tuple findFundamentalMatrix(py::array_t<double>  x1y1_,
     double h1,
     double w2,
     double h2,
+    py::array_t<double>  probabilities_,
     bool use_magsac_plus_plus,
     double sigma_th,
     double conf,
     int max_iters,
     int partition_num,
+    int sampler_id,
     bool save_samples) {
     py::buffer_info buf1 = x1y1_.request();
     size_t NUM_TENTS = buf1.shape[0];
@@ -124,11 +126,20 @@ py::tuple findFundamentalMatrix(py::array_t<double>  x1y1_,
     std::vector<bool> inliers(NUM_TENTS);
     std::vector<size_t> minimal_samples;
 
+    std::vector<double> probabilities;
+    if (sampler_id == 3)
+    {
+        py::buffer_info buf_prob = probabilities_.request();
+        double* ptr_prob = (double*)buf_prob.ptr;
+        probabilities.assign(ptr_prob, ptr_prob + buf_prob.size);        
+    }
+
     int num_inl = findFundamentalMatrix_(x1y1,
         x2y2,
         inliers,
         F,
         minimal_samples,
+        probabilities,
         w1,
         h1,
         w2,
@@ -138,6 +149,7 @@ py::tuple findFundamentalMatrix(py::array_t<double>  x1y1_,
         conf,
         max_iters,
         partition_num,
+        sampler_id,
         save_samples);
 
     py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
@@ -178,11 +190,13 @@ py::tuple findEssentialMatrix(py::array_t<double>  x1y1_,
     double h1,
     double w2,
     double h2,
+    py::array_t<double>  probabilities_,
     bool use_magsac_plus_plus,
     double sigma_th,
     double conf,
     int max_iters,
     int partition_num,
+    int sampler_id,
     bool save_samples) 
 {
     py::buffer_info buf1 = x1y1_.request();
@@ -240,6 +254,14 @@ py::tuple findEssentialMatrix(py::array_t<double>  x1y1_,
     std::vector<bool> inliers(NUM_TENTS);
     std::vector<size_t> minimal_samples;
 
+    std::vector<double> probabilities;
+    if (sampler_id == 3)
+    {
+        py::buffer_info buf_prob = probabilities_.request();
+        double* ptr_prob = (double*)buf_prob.ptr;
+        probabilities.assign(ptr_prob, ptr_prob + buf_prob.size);        
+    }
+
     int num_inl = findEssentialMatrix_(x1y1,
         x2y2,
         inliers,
@@ -247,6 +269,7 @@ py::tuple findEssentialMatrix(py::array_t<double>  x1y1_,
         K1, 
         K2,
         minimal_samples,
+        probabilities,
         w1,
         h1,
         w2,
@@ -256,6 +279,7 @@ py::tuple findEssentialMatrix(py::array_t<double>  x1y1_,
         conf,
         max_iters,
         partition_num,
+        sampler_id,
         save_samples);
 
     py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
@@ -396,11 +420,13 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("h1"),
         py::arg("w2"),
         py::arg("h2"),
+        py::arg("probabilities"),
         py::arg("use_magsac_plus_plus") = true,
         py::arg("sigma_th") = 1.0,
         py::arg("conf") = 0.99,
         py::arg("max_iters") = 1000,
         py::arg("partition_num") = 5,
+        py::arg("sampler_id") = 0,
         py::arg("save_samples") = false);
 
     m.def("findFundamentalMatrix", &findFundamentalMatrix, R"doc(some doc)doc",
@@ -410,11 +436,13 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("h1"),
         py::arg("w2"),
         py::arg("h2"),
+        py::arg("probabilities"),
         py::arg("use_magsac_plus_plus") = true,
         py::arg("sigma_th") = 1.0,
         py::arg("conf") = 0.99,
         py::arg("max_iters") = 1000,
         py::arg("partition_num") = 5,
+        py::arg("sampler_id") = 0,
         py::arg("save_samples") = false);
     
 
