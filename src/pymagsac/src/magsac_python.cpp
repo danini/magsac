@@ -1,13 +1,13 @@
 #include "magsac_python.hpp"
 #include "magsac.h"
-#include "fundamental_estimator.h"
-#include "homography_estimator.h"
+#include "estimators/fundamental_estimator.h"
+#include "estimators/homography_estimator.h"
 #include "types.h"
 #include "model.h"
 #include "utils.h"
-#include "estimators.h"
+#include "estimators/estimators.h"
 #include "most_similar_inlier_selector.h"
-#include "progressive_napsac_sampler.h"
+#include "samplers/progressive_napsac_sampler.h"
 #include <thread>
 
 #include <gflags/gflags.h>
