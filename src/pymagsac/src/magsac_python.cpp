@@ -8,6 +8,7 @@
 #include "estimators.h"
 #include "most_similar_inlier_selector.h"
 #include "samplers/progressive_napsac_sampler.h"
+#include "samplers/probabilistic_reordering_sampler.h"
 #include "samplers/importance_sampler.h"
 #include "samplers/uniform_sampler.h"
 #include "samplers/prosac_sampler.h"
@@ -22,6 +23,7 @@ int findFundamentalMatrix_(std::vector<double>& srcPts,
     std::vector<double>& F,
     std::vector<size_t> &minimal_samples,
     std::vector<double> &point_probabilities,
+    double variance,
     double sourceImageWidth,
     double sourceImageHeight,
     double destinationImageWidth,
@@ -85,6 +87,18 @@ int findFundamentalMatrix_(std::vector<double>& srcPts,
 		main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ImportanceSampler(&points, 
             point_probabilities,
             estimator.sampleSize()));
+	else if (sampler_id == 4)
+    {
+        double max_prob = 0;
+        for (const auto &prob : point_probabilities)
+            max_prob = MAX(max_prob, prob);
+        for (auto &prob : point_probabilities)
+            prob /= max_prob;
+		main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProbabilisticReorderingSampler(&points, 
+            point_probabilities,
+            estimator.sampleSize(),
+            variance));
+    }
     else
 	{
 		fprintf(stderr, "Unknown sampler identifier: %d. The accepted samplers are 0 (uniform sampling), 1 (PROSAC sampling), 2 (P-NAPSAC sampling)\n",
@@ -153,6 +167,7 @@ int findEssentialMatrix_(std::vector<double>& srcPts,
     std::vector<double>& dst_K,
     std::vector<size_t> &minimal_samples,
     std::vector<double> &point_probabilities,
+    double variance,
     double sourceImageWidth,
     double sourceImageHeight,
     double destinationImageWidth,
@@ -248,7 +263,18 @@ int findEssentialMatrix_(std::vector<double>& srcPts,
 		main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ImportanceSampler(&points, 
             point_probabilities,
             estimator.sampleSize()));
-    else
+	else if (sampler_id == 4)
+    {
+        double max_prob = 0;
+        for (const auto &prob : point_probabilities)
+            max_prob = MAX(max_prob, prob);
+        for (auto &prob : point_probabilities)
+            prob /= max_prob;
+		main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProbabilisticReorderingSampler(&points, 
+            point_probabilities,
+            estimator.sampleSize(),
+            variance));
+    } else
 	{
 		fprintf(stderr, "Unknown sampler identifier: %d. The accepted samplers are 0 (uniform sampling), 1 (PROSAC sampling), 2 (P-NAPSAC sampling)\n",
 			sampler_id);
