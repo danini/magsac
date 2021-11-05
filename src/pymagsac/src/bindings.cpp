@@ -128,7 +128,7 @@ py::tuple findFundamentalMatrix(py::array_t<double>  x1y1_,
     std::vector<size_t> minimal_samples;
 
     std::vector<double> probabilities;
-    if (sampler_id == 3)
+    if (sampler_id == 3 || sampler_id == 4)
     {
         py::buffer_info buf_prob = probabilities_.request();
         double* ptr_prob = (double*)buf_prob.ptr;
@@ -258,7 +258,7 @@ py::tuple findEssentialMatrix(py::array_t<double>  x1y1_,
     std::vector<size_t> minimal_samples;
 
     std::vector<double> probabilities;
-    if (sampler_id == 3)
+    if (sampler_id == 3 || sampler_id == 4)
     {
         py::buffer_info buf_prob = probabilities_.request();
         double* ptr_prob = (double*)buf_prob.ptr;
