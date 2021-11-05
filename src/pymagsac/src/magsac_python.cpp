@@ -5,7 +5,7 @@
 #include "types.h"
 #include "model.h"
 #include "utils.h"
-#include "estimators/estimators.h"
+#include "estimators.h"
 #include "most_similar_inlier_selector.h"
 #include "samplers/progressive_napsac_sampler.h"
 #include <thread>
