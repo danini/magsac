@@ -283,7 +283,7 @@ bool MAGSAC<DatumType, ModelEstimator>::run(
 		// Saving the minimal sample if needed
 		if (save_samples)
 		{
-			minimal_samples.emplace_back(std::vector<size_t>(5));
+			minimal_samples.emplace_back(std::vector<size_t>(sample_size));
 			for (size_t sample_idx = 0; sample_idx < sample_size; ++sample_idx)
 				minimal_samples.back()[sample_idx] = minimal_sample[sample_idx];
 		}
