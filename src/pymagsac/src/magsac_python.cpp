@@ -55,6 +55,7 @@ int findFundamentalMatrix_(std::vector<double>& srcPts,
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
     magsac->setIterationLimit(max_iters);
+    magsac->setMinimumIterationNumber(1000);
 
     int num_tents = srcPts.size() / 2;
     cv::Mat points(num_tents, 4, CV_64F);
