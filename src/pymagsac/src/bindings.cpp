@@ -170,9 +170,9 @@ py::tuple findFundamentalMatrix(py::array_t<double>  x1y1_,
             
     if (save_samples)
     {
-        const size_t sample_number = minimal_samples.size() / 5;
+        const size_t sample_number = minimal_samples.size() / 7;
 
-        py::array_t<int> minimal_samples_ = py::array_t<int>({ sample_number, 5 });
+        py::array_t<int> minimal_samples_ = py::array_t<int>({ sample_number, 7 });
         py::buffer_info buffer_samples = minimal_samples_.request();
         int* ptr_samples = (int*)buffer_samples.ptr;
         for (size_t i = 0; i < minimal_samples.size(); i++)
