@@ -80,59 +80,61 @@ py::tuple adaptiveInlierSelection(
 
 }
 
-py::tuple findFundamentalMatrix(py::array_t<double>  x1y1_,
-    py::array_t<double>  x2y2_,
+py::tuple findFundamentalMatrix(
+	py::array_t<double>  correspondences_,
     double w1, 
     double h1,
     double w2,
     double h2,
+	py::array_t<double>  probabilities_,
+	int sampler,
     bool use_magsac_plus_plus,
     double sigma_th,
     double conf,
+    int min_iters,
     int max_iters,
-    int partition_num) {
-    py::buffer_info buf1 = x1y1_.request();
-    size_t NUM_TENTS = buf1.shape[0];
-    size_t DIM = buf1.shape[1];
+    int partition_num)
+{
+	py::buffer_info buf1 = correspondences_.request();
+	size_t NUM_TENTS = buf1.shape[0];
+	size_t DIM = buf1.shape[1];
 
-    if (DIM != 2) {
-        throw std::invalid_argument("x1y1 should be an array with dims [n,2], n>=7");
-    }
+	if (DIM != 4) {
+		throw std::invalid_argument("x1y1 should be an array with dims [n,4], n>=7");
+	}
     if (NUM_TENTS < 7) {
-        throw std::invalid_argument("x1y1 should be an array with dims [n,2], n>=7");
-    }
-    py::buffer_info buf1a = x2y2_.request();
-    size_t NUM_TENTSa = buf1a.shape[0];
-    size_t DIMa = buf1a.shape[1];
-
-    if (DIMa != 2) {
-        throw std::invalid_argument("x2y2 should be an array with dims [n,2], n>=7");
-    }
-    if (NUM_TENTSa != NUM_TENTS) {
-        throw std::invalid_argument("x1y1 and x2y2 should be the same size");
+        throw std::invalid_argument("x1y1 should be an array with dims [n,4], n>=7");
     }
 
     double* ptr1 = (double*)buf1.ptr;
-    std::vector<double> x1y1;
-    x1y1.assign(ptr1, ptr1 + buf1.size);
+    std::vector<double> correspondences;
+    correspondences.assign(ptr1, ptr1 + buf1.size);
 
-    double* ptr1a = (double*)buf1a.ptr;
-    std::vector<double> x2y2;
-    x2y2.assign(ptr1a, ptr1a + buf1a.size);
     std::vector<double> F(9);
     std::vector<bool> inliers(NUM_TENTS);
 
-    int num_inl = findFundamentalMatrix_(x1y1,
-        x2y2,
+    std::vector<double> probabilities;
+    if (sampler == 3 || sampler == 4)
+    {
+        py::buffer_info buf_prob = probabilities_.request();
+        double* ptr_prob = (double*)buf_prob.ptr;
+        probabilities.assign(ptr_prob, ptr_prob + buf_prob.size);        
+    }
+
+    int num_inl = findFundamentalMatrix_(
+        correspondences,
         inliers,
         F,
+        probabilities,
         w1,
         h1,
         w2,
         h2,
+        sampler,
         use_magsac_plus_plus,
         sigma_th,
         conf,
+        min_iters,
         max_iters,
         partition_num);
 
@@ -152,47 +154,37 @@ py::tuple findFundamentalMatrix(py::array_t<double>  x1y1_,
     return py::make_tuple(F_, inliers_);
 }
 
-py::tuple findEssentialMatrix(py::array_t<double>  x1y1_,
-    py::array_t<double>  x2y2_,
+py::tuple findEssentialMatrix(
+	py::array_t<double>  correspondences_,
     py::array_t<double>  K1_,
     py::array_t<double>  K2_,
     double w1, 
     double h1,
     double w2,
     double h2,
+	py::array_t<double>  probabilities_,
+	int sampler,
     bool use_magsac_plus_plus,
     double sigma_th,
     double conf,
+    int min_iters,
     int max_iters,
-    int partition_num) {
-    py::buffer_info buf1 = x1y1_.request();
-    size_t NUM_TENTS = buf1.shape[0];
-    size_t DIM = buf1.shape[1];
+    int partition_num) 
+{
+	py::buffer_info buf1 = correspondences_.request();
+	size_t NUM_TENTS = buf1.shape[0];
+	size_t DIM = buf1.shape[1];
 
-    if (DIM != 2) {
-        throw std::invalid_argument("x1y1 should be an array with dims [n,2], n>=7");
-    }
+	if (DIM != 4) {
+		throw std::invalid_argument("x1y1 should be an array with dims [n,4], n>=5");
+	}
     if (NUM_TENTS < 5) {
-        throw std::invalid_argument("x1y1 should be an array with dims [n,2], n>=7");
-    }
-    py::buffer_info buf1a = x2y2_.request();
-    size_t NUM_TENTSa = buf1a.shape[0];
-    size_t DIMa = buf1a.shape[1];
-
-    if (DIMa != 2) {
-        throw std::invalid_argument("x2y2 should be an array with dims [n,2], n>=7");
-    }
-    if (NUM_TENTSa != NUM_TENTS) {
-        throw std::invalid_argument("x1y1 and x2y2 should be the same size");
+        throw std::invalid_argument("x1y1 should be an array with dims [n,4], n>=5");
     }
 
     double* ptr1 = (double*)buf1.ptr;
-    std::vector<double> x1y1;
-    x1y1.assign(ptr1, ptr1 + buf1.size);
-
-    double* ptr1a = (double*)buf1a.ptr;
-    std::vector<double> x2y2;
-    x2y2.assign(ptr1a, ptr1a + buf1a.size);
+    std::vector<double> correspondences;
+    correspondences.assign(ptr1, ptr1 + buf1.size);
 
     py::buffer_info K1_buf = K1_.request();
     size_t three_a = K1_buf.shape[0];
@@ -219,19 +211,30 @@ py::tuple findEssentialMatrix(py::array_t<double>  x1y1_,
     std::vector<double> E(9);
     std::vector<bool> inliers(NUM_TENTS);
 
-    int num_inl = findEssentialMatrix_(x1y1,
-        x2y2,
+    std::vector<double> probabilities;
+    if (sampler == 3 || sampler == 4)
+    {
+        py::buffer_info buf_prob = probabilities_.request();
+        double* ptr_prob = (double*)buf_prob.ptr;
+        probabilities.assign(ptr_prob, ptr_prob + buf_prob.size);        
+    }
+
+    int num_inl = findEssentialMatrix_(
+        correspondences,
         inliers,
-        E, 
+        E,
         K1, 
         K2,
+        probabilities,
         w1,
         h1,
         w2,
         h2,
+        sampler,
         use_magsac_plus_plus,
         sigma_th,
         conf,
+        min_iters,
         max_iters,
         partition_num);
 
@@ -253,59 +256,61 @@ py::tuple findEssentialMatrix(py::array_t<double>  x1y1_,
     return py::make_tuple(E_, inliers_);
 }
                                 
-py::tuple findHomography(py::array_t<double>  x1y1_,
-                         py::array_t<double>  x2y2_,
+py::tuple findHomography(
+	                     py::array_t<double>  correspondences_,
                          double w1, 
                          double h1,
                          double w2,
                          double h2,
+                         py::array_t<double>  probabilities_,
+                         int sampler,
 						 bool use_magsac_plus_plus,
                          double sigma_th,
                          double conf,
+                         int min_iters,
                          int max_iters,
-                         int partition_num) {
-    py::buffer_info buf1 = x1y1_.request();
-    size_t NUM_TENTS = buf1.shape[0];
-    size_t DIM = buf1.shape[1];
-    
-    if (DIM != 2) {
-        throw std::invalid_argument( "x1y1 should be an array with dims [n,2], n>=4" );
-    }
+                         int partition_num) 
+{
+	py::buffer_info buf1 = correspondences_.request();
+	size_t NUM_TENTS = buf1.shape[0];
+	size_t DIM = buf1.shape[1];
+
+	if (DIM != 4) {
+		throw std::invalid_argument("x1y1 should be an array with dims [n,4], n>=4");
+	}
     if (NUM_TENTS < 4) {
-        throw std::invalid_argument( "x1y1 should be an array with dims [n,2], n>=4");
+        throw std::invalid_argument("x1y1 should be an array with dims [n,4], n>=4");
     }
-    py::buffer_info buf1a = x2y2_.request();
-    size_t NUM_TENTSa = buf1a.shape[0];
-    size_t DIMa = buf1a.shape[1];
+
+    double* ptr1 = (double*)buf1.ptr;
+    std::vector<double> correspondences;
+    correspondences.assign(ptr1, ptr1 + buf1.size);
     
-    if (DIMa != 2) {
-        throw std::invalid_argument( "x2y2 should be an array with dims [n,2], n>=4" );
-    }
-    if (NUM_TENTSa != NUM_TENTS) {
-        throw std::invalid_argument( "x1y1 and x2y2 should be the same size");
-    }
-    
-    double *ptr1 = (double *) buf1.ptr;
-    std::vector<double> x1y1;
-    x1y1.assign(ptr1, ptr1 + buf1.size);
-    
-    double *ptr1a = (double *) buf1a.ptr;
-    std::vector<double> x2y2;
-    x2y2.assign(ptr1a, ptr1a + buf1a.size);
     std::vector<double> H(9);
     std::vector<bool> inliers(NUM_TENTS);
+
+    std::vector<double> probabilities;
+    if (sampler == 3 || sampler == 4)
+    {
+        py::buffer_info buf_prob = probabilities_.request();
+        double* ptr_prob = (double*)buf_prob.ptr;
+        probabilities.assign(ptr_prob, ptr_prob + buf_prob.size);        
+    }
     
-    int num_inl = findHomography_(x1y1,
-                    x2y2,
+    int num_inl = findHomography_(
+                    correspondences,
                     inliers,
                     H,
+                    probabilities,
                     w1,
                     h1,
                     w2,
                     h2,
+                    sampler,
 					use_magsac_plus_plus,
                     sigma_th,
                     conf,
+                    min_iters,
                     max_iters,
                     partition_num);
     
@@ -351,44 +356,50 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("minimumInlierNumber") = 20);
 
     m.def("findEssentialMatrix", &findEssentialMatrix, R"doc(some doc)doc",
-        py::arg("x1y1"),
-        py::arg("x2y2"),
+        py::arg("correspondences"),
         py::arg("K1"),
         py::arg("K2"),
         py::arg("w1"),
         py::arg("h1"),
         py::arg("w2"),
         py::arg("h2"),
+        py::arg("probabilities"),
+		py::arg("sampler") = 4,
         py::arg("use_magsac_plus_plus") = true,
         py::arg("sigma_th") = 1.0,
         py::arg("conf") = 0.99,
+        py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
         py::arg("partition_num") = 5);
 
     m.def("findFundamentalMatrix", &findFundamentalMatrix, R"doc(some doc)doc",
-        py::arg("x1y1"),
-        py::arg("x2y2"),
+        py::arg("correspondences"),
         py::arg("w1"),
         py::arg("h1"),
         py::arg("w2"),
         py::arg("h2"),
+        py::arg("probabilities"),
+		py::arg("sampler") = 4,
         py::arg("use_magsac_plus_plus") = true,
         py::arg("sigma_th") = 1.0,
         py::arg("conf") = 0.99,
+        py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
         py::arg("partition_num") = 5);
     
 
   m.def("findHomography", &findHomography, R"doc(some doc)doc",
-        py::arg("x1y1"),
-        py::arg("x2y2"),
+        py::arg("correspondences"),
         py::arg("w1"),
         py::arg("h1"),
         py::arg("w2"),
         py::arg("h2"),
+        py::arg("probabilities"),
+		py::arg("sampler") = 4,
         py::arg("use_magsac_plus_plus") = true,
         py::arg("sigma_th") = 1.0,
         py::arg("conf") = 0.99,
+        py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
         py::arg("partition_num") = 5); 
 

@@ -99,8 +99,6 @@ public:
 	// Otherwise, the threads will act weirdly.
 	void setCoreNumber(size_t core_number_)
 	{
-		if (magsac_version == MAGSAC_PLUS_PLUS)
-			LOG(ERROR) << "Setting the core number for MAGSAC++ is deprecated.";
 		core_number = core_number_;
 	}
 
@@ -108,8 +106,6 @@ public:
 	// to speed up the procedure. In MAGSAC++, this parameter is not used.
 	void setPartitionNumber(size_t partition_number_)
 	{
-		if (magsac_version == MAGSAC_PLUS_PLUS)
-			LOG(ERROR) << "Setting the partition number for MAGSAC++ is deprecated.";
 		partition_number = partition_number_;
 	}
 
