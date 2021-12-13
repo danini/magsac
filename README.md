@@ -77,6 +77,8 @@ The example for fundamental matrix fitting is available at: [notebook](examples/
 
 The example for essential matrix fitting is available at: [notebook](examples/example_essential_matrix.ipynb).
 
+An example comparing different samplers on fundamental matrix estimation is available at: [notebook](examples/example_samplers.ipynb).
+
 # Requirements
 
 - Eigen 3.0 or higher
