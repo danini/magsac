@@ -407,7 +407,7 @@ namespace magsac
 					magsac::estimator::FundamentalMatrixEstimator<
 						gcransac::estimator::solver::FundamentalMatrixPlaneParallaxSolver, // The solver used for fitting a model to a minimal sample
 						gcransac::estimator::solver::FundamentalMatrixEightPointSolver> estimator(maximum_threshold, 0.0, false);
-					estimator.getMinimalSolver()->setHomography(&nonminimal_homography);
+					estimator.getMutableMinimalSolver()->setHomography(&nonminimal_homography);
 
 					std::vector<int> inliers;
 					gcransac::Model model;
@@ -523,7 +523,7 @@ namespace magsac
 	namespace utils
 	{
 		// The default estimator for essential matrix fitting
-		typedef estimator::EssentialMatrixEstimator<gcransac::estimator::solver::EssentialMatrixFivePointSteweniusSolver, // The solver used for fitting a model to a minimal sample
+		typedef estimator::EssentialMatrixEstimator<gcransac::estimator::solver::EssentialMatrixFivePointNisterSolver, // The solver used for fitting a model to a minimal sample
 			gcransac::estimator::solver::EssentialMatrixBundleAdjustmentSolver> // The solver used for fitting a model to a non-minimal sample
 			DefaultEssentialMatrixEstimator;
 
