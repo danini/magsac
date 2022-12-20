@@ -1,5 +1,6 @@
 #pragma once
 
+#include "estimators/rigid_transformation_estimator.h"
 #include "estimators/essential_estimator.h"
 #include "estimators/fundamental_estimator.h"
 #include "estimators/homography_estimator.h"
@@ -8,7 +9,8 @@
 namespace magsac
 {
 	namespace estimator
-	{// This is the estimator class for estimating a fundamental matrix between two images. 
+	{
+		// This is the estimator class for estimating a fundamental matrix between two images. 
 		template<class _MinimalSolverEngine,  // The solver used for estimating the model from a minimal sample
 			class _NonMinimalSolverEngine> // The solver used for estimating the model from a non-minimal sample
 			class HomographyEstimator :
@@ -51,6 +53,72 @@ namespace magsac
 				return 1.0;
 			}
 
+			static constexpr double getUpperIncompleteGammaOfK()
+			{
+				return 0.0036572608340910764;
+			}
+
+			// Calculating the lower incomplete gamma value of (DoF + 1) / 2 with k^2 / 2.
+			static constexpr double getLowerIncompleteGammaOfK()
+			{
+				return 1.3012265540498875;
+			}
+
+			static constexpr double getChiSquareParamCp()
+			{
+				return 1.0 / (4.0 * getGammaFunction());
+			}
+
+			static constexpr bool doesNormalizationForNonMinimalFitting()
+			{
+				return true;
+			}
+		};
+
+		
+		// This is the estimator class for estimating a fundamental matrix between two images. 
+		template<class _MinimalSolverEngine,  // The solver used for estimating the model from a minimal sample
+			class _NonMinimalSolverEngine> // The solver used for estimating the model from a non-minimal sample
+			class RigidTransformationEstimator :
+			public gcransac::estimator::RigidTransformationEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>
+		{
+		public:
+			using gcransac::estimator::RigidTransformationEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>::residual;
+
+			RigidTransformationEstimator() :
+				gcransac::estimator::RigidTransformationEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>()
+			{}
+
+			// Calculating the residual which is used for the MAGSAC score calculation.
+			// Since symmetric epipolar distance is usually more robust than Sampson-error.
+			// we are using it for the score calculation.
+			inline double residualForScoring(const cv::Mat& point_,
+				const gcransac::Model& model_) const
+			{
+				return residual(point_, model_.descriptor);
+			}
+
+			static constexpr double getSigmaQuantile()
+			{
+				return 3.64;
+			}
+
+			static constexpr size_t getDegreesOfFreedom()
+			{
+				return 4;
+			}
+
+			static constexpr double getGammaFunction()
+			{
+				return 1.0;
+			}
+
+			static constexpr double getC()
+			{
+				return 0.25;
+			}
+
+			// Calculating the upper incomplete gamma value of (DoF - 1) / 2 with k^2 / 2.
 			static constexpr double getUpperIncompleteGammaOfK()
 			{
 				return 0.0036572608340910764;
@@ -536,5 +604,10 @@ namespace magsac
 		typedef estimator::HomographyEstimator<gcransac::estimator::solver::HomographyFourPointSolver, // The solver used for fitting a model to a minimal sample
 			gcransac::estimator::solver::HomographyFourPointSolver> // The solver used for fitting a model to a non-minimal sample
 			DefaultHomographyEstimator;
+
+		// The default estimator for rigid transformation fitting
+		typedef estimator::RigidTransformationEstimator<gcransac::estimator::solver::RigidTransformationSVDBasedSolver, // The solver used for fitting a model to a minimal sample
+			gcransac::estimator::solver::RigidTransformationSVDBasedSolver> // The solver used for fitting a model to a non-minimal sample
+			DefaultRigidTransformationEstimator;
 	}
 }

@@ -62,3 +62,18 @@ int findEssentialMatrix_(std::vector<double>& correspondences,
     int min_iters,
     int max_iters,
     int partition_num);
+
+    
+int findRigidTransformation_(
+    std::vector<double>& correspondences,
+    std::vector<bool>& inliers,
+    std::vector<double>& F,
+    std::vector<double>& inlier_probabilities,
+    int sampler_id,
+    bool use_magsac_plus_plus,
+    double sigma_max,
+    double conf,
+    //double neighborhood_size,
+    int min_iters,
+    int max_iters,
+    int partition_num);
