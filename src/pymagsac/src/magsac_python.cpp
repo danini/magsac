@@ -1,5 +1,7 @@
 #include "magsac_python.hpp"
 #include "magsac.h"
+#include "estimators/solver_essential_matrix_five_point_stewenius.h"
+#include "estimators/solver_essential_matrix_bundle_adjustment.h"
 #include "estimators/fundamental_estimator.h"
 #include "estimators/homography_estimator.h"
 #include "types.h"
@@ -17,8 +19,6 @@
 #include <thread>
 
 #include <gflags/gflags.h>
-#include <glog/logging.h>
-
 
 int findRigidTransformation_(
     std::vector<double>& correspondences,
@@ -421,13 +421,42 @@ int findEssentialMatrix_(std::vector<double>& correspondences,
         return 0;
     }
 
+    // Initializing the weights for the bundle adjustment
+	std::vector<double> weights;
+	std::vector<size_t> inlier_indices;
+    weights.reserve(points.rows);
+    inlier_indices.reserve(points.rows);
+
+    double residual;
     int num_inliers = 0;
     for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx) {
+        residual = estimator.residual(normalized_points.row(pt_idx), model.descriptor);
         const int is_inlier = 
-            estimator.residual(normalized_points.row(pt_idx), model.descriptor) <= normalized_sigma_max;
+            residual <= normalized_sigma_max;
         inliers[pt_idx] = (bool)is_inlier;
         num_inliers += is_inlier;
+
+        if (is_inlier)
+        {
+            inlier_indices.emplace_back(pt_idx);
+            weights.emplace_back(1.0);
+        }
     }
+
+    // Apply bundle adjustment on the final points
+    if (num_inliers > 5)
+    {   
+        std::vector<gcransac::Model> models = { model };
+		gcransac::estimator::solver::EssentialMatrixBundleAdjustmentSolver bundleOptimizer(
+            pose_lib::BundleOptions::LossType::CAUCHY);
+		bundleOptimizer.estimateModel(
+			normalized_points,
+			&inlier_indices[0],
+			inlier_indices.size(),
+			models,
+			&weights[0]);
+    }
+			
 
     E.resize(9);
     for (int i = 0; i < 3; i++) {
@@ -583,7 +612,7 @@ int adaptiveInlierSelection_(
 {
     if (problemType_ > 2)
     {
-        LOG(ERROR) << "The valid settings for variable 'problemType' are\n\t 0 (homography)\n\t 1 (fundamental matrix) \n\t 2 (essential matrix)\n";
+        printf("The valid settings for variable 'problemType' are\n\t 0 (homography)\n\t 1 (fundamental matrix) \n\t 2 (essential matrix)\n");
         return 0;
     }
 
@@ -645,7 +674,7 @@ int adaptiveInlierSelection_(
     }
     else
     {
-        LOG(INFO) << "Note: for essential matrices, the correspondences should be normalized by the intrinsic camera matrices.";
+        printf("Note: for essential matrices, the correspondences should be normalized by the intrinsic camera matrices.");
 
         gcransac::Model model;
         model.descriptor.resize(3, 3);

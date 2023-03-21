@@ -1,6 +1,7 @@
 #pragma once
 
 #include <limits>
+#include <iostream>
 #include <chrono>
 #include <memory>
 #include "model.h"
@@ -15,7 +16,6 @@
 #endif
 
 #include <gflags/gflags.h>
-#include <glog/logging.h>
 
 template <class DatumType, class ModelEstimator>
 class MAGSAC  
@@ -207,7 +207,7 @@ bool MAGSAC<DatumType, ModelEstimator>::run(
 	
 	if (points_.rows < sample_size)
 	{	
-		LOG(WARNING) << "There are not enough points for applying robust estimation. Minimum is "
+		std::cout << "There are not enough points for applying robust estimation. Minimum is "
 			<< static_cast<int>(sample_size) 
 			<< "; while " 
 			<< static_cast<int>(points_.rows) 
@@ -328,7 +328,7 @@ bool MAGSAC<DatumType, ModelEstimator>::postProcessing(
 	ModelScore &refined_score_,
 	const ModelEstimator &estimator_)
 {
-	LOG(WARNING) << "Sigma-consensus++ is not implemented yet as post-processing.";
+	std::cout << "Sigma-consensus++ is not implemented yet as post-processing.";
 	return false;
 }
 
@@ -467,13 +467,54 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensus(
 				sigma_inlier_number,
 				&sigma_models);
 
-			// If the estimation was successful calculate the implied probabilities
-			if (sigma_models.size() == 1)
-			{
-				const double max_sigma_squared_2 = 2 * max_sigma * max_sigma;
-				double residual_i_2, // The residual of the i-th point
-					probability_i; // The probability of the i-th point
+			const double max_sigma_squared_2 = 2 * max_sigma * max_sigma;
+			double residual_i_2, // The residual of the i-th point
+				probability_i; // The probability of the i-th point
 
+			// If the estimation was successful calculate the implied probabilities
+			if (sigma_models.size() > 1)
+			{
+				size_t best_model_idx = 0;
+				double probability_sum = 0.0,
+					best_probability_sum = 0.0;
+				std::vector<double> probabilities(sigma_inliers.size(), 0),
+					tmp_probabilities(sigma_inliers.size(), 0);
+
+				for (size_t model_idx = 0; model_idx < sigma_models.size(); ++model_idx)
+				{
+					const double max_sigma_squared_2 = 2 * max_sigma * max_sigma;
+					double residual_i_2, // The residual of the i-th point
+						probability_i; // The probability of the i-th point
+
+					// Iterate through all points to estimate the related probabilities
+					for (size_t relative_point_idx = 0; relative_point_idx < sigma_inliers.size(); ++relative_point_idx)
+					{
+						// TODO: Replace with Chi-square instead of normal distribution
+						const size_t &point_idx = sigma_inliers[relative_point_idx];
+
+						// Calculate the residual of the current point
+						residual_i_2 = estimator_.squaredResidual(points_.row(point_idx),
+							sigma_models[0]);
+
+						// Calculate the probability of the i-th point assuming Gaussian distribution
+						// TODO: replace by Chi-square distribution
+						probability_i = exp(-residual_i_2 / max_sigma_squared_2);
+						probability_sum += probability_i;
+						tmp_probabilities[relative_point_idx] = probability_i;
+					}
+
+					if (probability_sum > best_probability_sum)
+					{
+						best_probability_sum = probability_sum;
+						best_model_idx = model_idx;
+						tmp_probabilities.swap(probabilities);
+					}
+				}
+
+				for (size_t relative_point_idx = 0; relative_point_idx < sigma_inliers.size(); ++relative_point_idx)
+					point_weights_par[partition_idx][relative_point_idx] += probabilities[relative_point_idx];
+			} else if (sigma_models.size() == 1)
+			{
 				// Iterate through all points to estimate the related probabilities
 				for (size_t relative_point_idx = 0; relative_point_idx < sigma_inliers.size(); ++relative_point_idx)
 				{
@@ -490,14 +531,12 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensus(
 
 					// Store the probability of the i-th point coming from the current partition
 					point_weights_par[partition_idx][relative_point_idx] += probability_i;
-
-
 				}
 			}
 		}
 	}
 #else
-	LOG(ERROR) << "Not implemented yet.";
+	std::cerr << "Not implemented yet.";
 #endif
 
 	// The weights used for the final weighted least-squares fitting
@@ -547,33 +586,41 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensus(
 		return false;
 
 	bool is_model_updated = false;
+	double best_score = 0,
+		best_marginalized_iteration_number;
 	
-	if (sigma_models.size() == 1 && // If only a single model is estimated
-		estimator_.isValidModel(sigma_models.back(),
+	for (auto &sigma_model : sigma_models)
+	{
+		if (!estimator_.isValidModel(sigma_model,
 			points_,
 			sigma_inliers,
 			&(sigma_inliers)[0],
 			interrupting_threshold,
 			is_model_updated)) // and it is valid
-	{
-		// Return the refined model
-		refined_model_ = sigma_models.back();
+			continue;
 
 		// Calculate the score of the model and the implied iteration number
 		double marginalized_iteration_number;
 		getModelQuality(points_, // All the input points
-			refined_model_, // The estimated model
+			sigma_model, // The estimated model
 			estimator_, // The estimator
 			marginalized_iteration_number, // The marginalized inlier ratio
 			score_.score); // The marginalized score
 
-		if (marginalized_iteration_number < 0 || std::isnan(marginalized_iteration_number))
-			last_iteration_number = std::numeric_limits<int>::max();
-		else
-			last_iteration_number = static_cast<int>(round(marginalized_iteration_number));
-		return true;
+		// Return the refined model
+		if (score_.score > best_score)
+		{
+			refined_model_ = sigma_model;
+			best_score = score_.score;
+			best_marginalized_iteration_number = marginalized_iteration_number;
+		}
 	}
-	return false;
+
+	if (best_marginalized_iteration_number < 0 || std::isnan(best_marginalized_iteration_number))
+		last_iteration_number = std::numeric_limits<int>::max();
+	else
+		last_iteration_number = static_cast<int>(round(best_marginalized_iteration_number));
+	return sigma_models.size() > 0;
 }
 
 template <class DatumType, class ModelEstimator>
@@ -809,12 +856,33 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensusPlusPlus(
 			break;
 		}
 
-		// Update the model parameters
-		polished_model = sigma_models[0];
+		// Check all estimated models
+		double current_score,
+			current_best_score = 0.0;
+		for (const auto &sigma_model : sigma_models)
+		{
+			// Calculate the score of the model
+			current_score = 0.0;
+			getModelQualityPlusPlus(points_, // All the input points
+				sigma_model, // The estimated model
+				estimator_, // The estimator
+				current_score, // The marginalized score
+				best_score_.score); // The score of the previous so-far-the-best model
+
+			// Check if this model is better than the others in the pool
+			if (current_best_score < current_score)
+			{
+				// Save the current model score
+				current_best_score = current_score;
+				// Update the model parameters
+				polished_model = sigma_model;
+				// The model has been updated
+				updated = true;
+			}
+		}
+
 		// Clear the vector of models and keep only the best
 		sigma_models.clear();
-		// The model has been updated
-		updated = true;
 	}
 
 	bool is_model_updated = false;
@@ -831,7 +899,6 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensusPlusPlus(
 		refined_model_ = polished_model;
 
 		// Calculate the score of the model and the implied iteration number
-		double marginalized_iteration_number;
 		getModelQualityPlusPlus(points_, // All the input points
 			refined_model_, // The estimated model
 			estimator_, // The estimator

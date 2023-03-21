@@ -9,10 +9,10 @@
 #include "model.h"
 
 #include <vector>
+#include <iostream>
 #include <fstream>
 
 #include <gflags/gflags.h>
-#include <glog/logging.h>
 
 /**************************************************
 Declaration
@@ -89,7 +89,7 @@ void refineManualLabeling(
 
 	if (models.size() != 1)
 	{
-		LOG(ERROR) << "A problem occured when refining the manual annotation.";
+		std::cerr << "A problem occured when refining the manual annotation.";
 		return;
 	}
 

@@ -4,6 +4,7 @@
 #include <ctime>
 #include <chrono>
 #include <cstddef>
+#include <iostream>
 #include <mutex>
 #include <memory>
 #include <opencv2/core.hpp>
@@ -27,7 +28,6 @@
 #include "estimators.h"
 
 #include <gflags/gflags.h>
-#include <glog/logging.h>
 
 /*
 	Initializing the flags
@@ -109,11 +109,8 @@ int main(int argc, char** argv)
 {	
 	// Parsing the flags
 	gflags::ParseCommandLineFlags(&argc, &argv, true);
-	
-	// Initialize Google's logging library.
-	google::InitGoogleLogging(argv[0]);
 
-	printf("If you want to see the details of the fitting, e.g., time or estimation quality, turn on logging by starting the application as 'GLOG_logtostderr=1 ./SampleProject' or by using flag '--logtostderr=1'\n");
+	printf("If you want to see the details of the fitting, e.g., time or estimation quality, turn on logging by starting the application as './SampleProject'\n");
 	printf("Accepted flags:"); 
 	printf("\n\t--problem-type {0,1,2} - The example problem which should run. Values: (0) Homography estimation, (1) Fundamental matrix estimation, (2) Essential matrix estimation. Default: 0");
 	printf("\n\t--draw-results {0,1} - A flag determining if the results should be drawn and visualized. Default: 1");
@@ -136,7 +133,7 @@ int main(int argc, char** argv)
 	switch (FLAGS_problem_type)
 	{
 		case 0:
-			LOG(INFO) << "Running homography estimation examples.";
+			std::cout  << "Running homography estimation examples.";
 
 			// Run homography estimation on the EVD dataset
 			runTest(SceneType::HomographyScene, Dataset::extremeview, ransac_confidence, FLAGS_draw_results, drawing_threshold_homography);
@@ -145,7 +142,7 @@ int main(int argc, char** argv)
 			runTest(SceneType::HomographyScene, Dataset::homogr, ransac_confidence, FLAGS_draw_results, drawing_threshold_homography);
 			break;
 		case 1:
-			LOG(INFO) << "Running fundamental matrix estimation examples.";
+			std::cout  << "Running fundamental matrix estimation examples.";
 
 			// Run fundamental matrix estimation on the kusvod2 dataset
 			runTest(SceneType::FundamentalMatrixScene, Dataset::kusvod2, ransac_confidence, FLAGS_draw_results, drawing_threshold_fundamental_matrix);
@@ -157,13 +154,13 @@ int main(int argc, char** argv)
 			runTest(SceneType::FundamentalMatrixScene, Dataset::multih, ransac_confidence, FLAGS_draw_results, drawing_threshold_fundamental_matrix);
 			break;
 		case 2:
-			LOG(INFO) << "Running essential matrix estimation examples.";
+			std::cout  << "Running essential matrix estimation examples.";
 
 			// Run essential matrix estimation on a scene from the strecha dataset
 			runTest(SceneType::EssentialMatrixScene, Dataset::strecha, ransac_confidence, FLAGS_draw_results, drawing_threshold_essential_matrix);
 			break;
 		default:
-			LOG(ERROR) << "Problem type " << FLAGS_problem_type << " is unknown. Valid values are 0,1,2.";
+			std::cerr << "Problem type " << FLAGS_problem_type << " is unknown. Valid values are 0,1,2.";
 			break;
 	}
 	return 0;
@@ -189,7 +186,7 @@ void runTest(SceneType scene_type_, // The type of the fitting problem
 		// Close all opened windows
 		cv::destroyAllWindows();
 
-		LOG(INFO) << "\n--------------------------------------------------------------\n" <<
+		std::cout  << "\n--------------------------------------------------------------\n" <<
 			problem_name << " estimation on scene " << scene << " from dataset " << dataset_name << ".\n" <<
 			"--------------------------------------------------------------\n";
 
@@ -197,7 +194,7 @@ void runTest(SceneType scene_type_, // The type of the fitting problem
 		if (scene_type_ == SceneType::HomographyScene)
 		{
 			// Apply the homography estimation method built into OpenCV
-			LOG(INFO) << "1. Running OpenCV's RANSAC with threshold " << drawing_threshold_ << " px";
+			std::cout  << "1. Running OpenCV's RANSAC with threshold " << drawing_threshold_ << " px";
 			opencvHomographyFitting(ransac_confidence_,
 				drawing_threshold_, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
@@ -205,7 +202,7 @@ void runTest(SceneType scene_type_, // The type of the fitting problem
 				false); // A flag to apply the MAGSAC post-processing to the OpenCV's output
 			
 			// Apply MAGSAC with maximum threshold set to a fairly high value
-			LOG(INFO) << "2. Running MAGSAC with fairly high maximum threshold (" << 50 << " px)";
+			std::cout  << "2. Running MAGSAC with fairly high maximum threshold (" << 50 << " px)";
 			testHomographyFitting(ransac_confidence_,
 				50.0, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
@@ -214,7 +211,7 @@ void runTest(SceneType scene_type_, // The type of the fitting problem
 				2.5); // The inlier threshold for visualization.
 			
 			// Apply MAGSAC with maximum threshold set to a fairly high value
-			LOG(INFO) << "3. Running MAGSAC++ with fairly high maximum threshold (" << 50 << " px)";
+			std::cout  << "3. Running MAGSAC++ with fairly high maximum threshold (" << 50 << " px)";
 			testHomographyFitting(ransac_confidence_,
 				50.0, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
@@ -224,7 +221,7 @@ void runTest(SceneType scene_type_, // The type of the fitting problem
 		} else if (scene_type_ == SceneType::FundamentalMatrixScene)
 		{
 			// Apply the homography estimation method built into OpenCV
-			LOG(INFO) << "1. Running OpenCV's RANSAC with threshold " << drawing_threshold_ << " px";
+			std::cout  << "1. Running OpenCV's RANSAC with threshold " << drawing_threshold_ << " px";
 			opencvFundamentalMatrixFitting(ransac_confidence_,
 				drawing_threshold_, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
@@ -232,7 +229,7 @@ void runTest(SceneType scene_type_, // The type of the fitting problem
 				false); // A flag to apply the MAGSAC post-processing to the OpenCV's output
 			
 			// Apply MAGSAC with fairly high maximum threshold
-			LOG(INFO) << "2. Running MAGSAC with fairly high maximum threshold (" << 5 << " px)";
+			std::cout  << "2. Running MAGSAC with fairly high maximum threshold (" << 5 << " px)";
 			testFundamentalMatrixFitting(ransac_confidence_, // The required confidence in the results
 				5.0, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
@@ -241,7 +238,7 @@ void runTest(SceneType scene_type_, // The type of the fitting problem
 				drawing_threshold_); // The inlier threshold for visualization.
 			
 			// Apply MAGSAC++ with fairly high maximum threshold
-			LOG(INFO) << "3. Running MAGSAC++ with fairly high maximum threshold (" << 5 << " px)";
+			std::cout  << "3. Running MAGSAC++ with fairly high maximum threshold (" << 5 << " px)";
 			testFundamentalMatrixFitting(ransac_confidence_, // The required confidence in the results
 				5.0, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
@@ -252,14 +249,14 @@ void runTest(SceneType scene_type_, // The type of the fitting problem
 		} else if (scene_type_ == SceneType::EssentialMatrixScene)
 		{
 			// Apply the homography estimation method built into OpenCV
-			LOG(INFO) << "1. Running OpenCV's RANSAC with threshold " << drawing_threshold_ << " px";
+			std::cout  << "1. Running OpenCV's RANSAC with threshold " << drawing_threshold_ << " px";
 			opencvEssentialMatrixFitting(ransac_confidence_,
 				drawing_threshold_, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
 				false); // A flag to draw and show the results
 
 			// Apply MAGSAC with a reasonably set maximum threshold
-			LOG(INFO) << "2. Running MAGSAC with fairly high maximum threshold (" << 5 << " px)";
+			std::cout  << "2. Running MAGSAC with fairly high maximum threshold (" << 5 << " px)";
 			testEssentialMatrixFitting(ransac_confidence_, // The required confidence in the results
 				2.0, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
@@ -268,7 +265,7 @@ void runTest(SceneType scene_type_, // The type of the fitting problem
 				drawing_threshold_); // The inlier threshold for visualization.
 
 			// Apply MAGSAC with a reasonably set maximum threshold
-			LOG(INFO) << "3. Running MAGSAC++ with fairly high maximum threshold (" << 5 << " px)";
+			std::cout  << "3. Running MAGSAC++ with fairly high maximum threshold (" << 5 << " px)";
 			testEssentialMatrixFitting(ransac_confidence_, // The required confidence in the results
 				2.0, // The maximum sigma value allowed in MAGSAC
 				scene, // The scene type
@@ -376,7 +373,7 @@ void testEssentialMatrixFitting(
 	bool draw_results_,
 	double drawing_threshold_)
 {
-	LOG(INFO) << "Processed scene = '" << test_scene_ << "'";
+	std::cout  << "Processed scene = '" << test_scene_ << "'";
 
 	// Load the images of the current test scene
 	cv::Mat image1 = cv::imread("../data/essential_matrix/" + test_scene_ + "1.png");
@@ -389,7 +386,7 @@ void testEssentialMatrixFitting(
 
 	if (image1.cols == 0)
 	{
-		LOG(ERROR) << "A problem occured when loading the images for test scene " << test_scene_ << ".";
+		std::cerr << "A problem occured when loading the images for test scene " << test_scene_ << ".";
 		return;
 	}
 
@@ -406,7 +403,7 @@ void testEssentialMatrixFitting(
 	if (!gcransac::utils::loadMatrix<double, 3, 3>(source_intrinsics_path,
 		intrinsics_source))
 	{
-		LOG(ERROR) << "An error occured when loading the intrinsics camera matrix from " << source_intrinsics_path << ".";
+		std::cerr << "An error occured when loading the intrinsics camera matrix from " << source_intrinsics_path << ".";
 		return;
 	}
 
@@ -414,7 +411,7 @@ void testEssentialMatrixFitting(
 	if (!gcransac::utils::loadMatrix<double, 3, 3>(destination_intrinsics_path,
 		intrinsics_destination))
 	{
-		LOG(ERROR) << "An error occured when loading the intrinsics camera matrix from " << destination_intrinsics_path << ".";
+		std::cerr << "An error occured when loading the intrinsics camera matrix from " << destination_intrinsics_path << ".";
 		return;
 	}
 
@@ -438,7 +435,7 @@ void testEssentialMatrixFitting(
 
 	if (N == 0) // If there are no points, return
 	{
-		LOG(ERROR) << "A problem occured when loading the annotated points for test scene " << test_scene_ << ".";
+		std::cerr << "A problem occured when loading the annotated points for test scene " << test_scene_ << ".";
 		return;
 	}
 
@@ -449,8 +446,8 @@ void testEssentialMatrixFitting(
 		0.0); 
 	gcransac::EssentialMatrix model; // The estimated model
 	
-	LOG(INFO) << "Estimated model = " << "essential matrix";
-	LOG(INFO) << "Number of correspondences loaded = " << static_cast<int>(N);
+	std::cout  << "Estimated model = " << "essential matrix";
+	std::cout  << "Number of correspondences loaded = " << static_cast<int>(N);
 	
 	// Initialize the sampler used for selecting minimal samples
 	gcransac::sampler::ProgressiveNapsacSampler<4> main_sampler(&points,
@@ -488,8 +485,8 @@ void testEssentialMatrixFitting(
 	std::chrono::duration<double> elapsed_seconds = end - start;
 	std::time_t end_time = std::chrono::system_clock::to_time_t(end);
 
-	LOG(INFO) << "Actual number of iterations drawn by MAGSAC at " << ransac_confidence_ << " confidence = " << iteration_number;
-	LOG(INFO) << "Elapsed time = " << elapsed_seconds.count() << " seconds";
+	std::cout  << "Actual number of iterations drawn by MAGSAC at " << ransac_confidence_ << " confidence = " << iteration_number;
+	std::cout  << "Elapsed time = " << elapsed_seconds.count() << " seconds";
 	
 	// Visualization part.
 	// Inliers are selected using threshold and the estimated model. 
@@ -511,7 +508,7 @@ void testEssentialMatrixFitting(
 		}
 	}
 
-	LOG(INFO) << "Number of points closer than " << drawing_threshold_ << " is " << static_cast<int>(inlier_number);
+	std::cout  << "Number of points closer than " << drawing_threshold_ << " is " << static_cast<int>(inlier_number);
 
 	if (draw_results_)
 	{
@@ -541,7 +538,7 @@ void testFundamentalMatrixFitting(
 	bool draw_results_,
 	double drawing_threshold_)
 {
-	LOG(INFO) << "Processed scene = '" << test_scene_ << "'.";
+	std::cout  << "Processed scene = '" << test_scene_ << "'.";
 
 	// Load the images of the current test scene
 	cv::Mat image1 = cv::imread("../data/fundamental_matrix/" + test_scene_ + "A.png");
@@ -554,7 +551,7 @@ void testFundamentalMatrixFitting(
 
 	if (image1.cols == 0)
 	{
-		LOG(ERROR) << "A problem occured when loading the images for test scene " << test_scene_ << ".";
+		std::cerr << "A problem occured when loading the images for test scene " << test_scene_ << ".";
 		return;
 	}
 
@@ -571,7 +568,7 @@ void testFundamentalMatrixFitting(
 
 	if (N == 0) // If there are no points, return
 	{
-		LOG(ERROR) << "A problem occured when loading the annotated points for test scene " << test_scene_ << ".";
+		std::cerr << "A problem occured when loading the annotated points for test scene " << test_scene_ << ".";
 		return; 
 	}
 
@@ -596,10 +593,10 @@ void testFundamentalMatrixFitting(
 		refined_inliers.swap(ground_truth_inliers);
 	const size_t inlier_number = static_cast<double>(ground_truth_inliers.size());
 
-	LOG(INFO) << "Estimated model = fundamental matrix";
-	LOG(INFO) << "Number of correspondences loaded = " << static_cast<int>(N);
-	LOG(INFO) << "Number of ground truth inliers = " << static_cast<int>(inlier_number);
-	LOG(INFO) << "Theoretical RANSAC iteration number at " << ransac_confidence_ << " confidence = " <<
+	std::cout  << "Estimated model = fundamental matrix";
+	std::cout  << "Number of correspondences loaded = " << static_cast<int>(N);
+	std::cout  << "Number of ground truth inliers = " << static_cast<int>(inlier_number);
+	std::cout  << "Theoretical RANSAC iteration number at " << ransac_confidence_ << " confidence = " <<
 		static_cast<int>(log(1.0 - ransac_confidence_) / log(1.0 - pow(static_cast<double>(inlier_number) / static_cast<double>(N), 7)));
 
 	// Initialize the sampler used for selecting minimal samples	
@@ -636,12 +633,12 @@ void testFundamentalMatrixFitting(
 
 	std::chrono::duration<double> elapsed_seconds = end - start;
 
-	LOG(INFO) << "Actual number of iterations drawn by MAGSAC at " << ransac_confidence_ << " confidence = " << iteration_number;
-	LOG(INFO) << "Elapsed time = " << elapsed_seconds.count() << " seconds";
+	std::cout  << "Actual number of iterations drawn by MAGSAC at " << ransac_confidence_ << " confidence = " << iteration_number;
+	std::cout  << "Elapsed time = " << elapsed_seconds.count() << " seconds";
 
 	if (!success)
 	{
-		LOG(WARNING) << "No reasonable model has been found. Returning.";
+		std::cout  << "No reasonable model has been found. Returning.";
 		return;
 	}
 
@@ -650,14 +647,14 @@ void testFundamentalMatrixFitting(
 	for (const auto &inlier_idx : ground_truth_inliers)
 		rmse += estimator.squaredResidual(points.row(inlier_idx), model);
 	rmse = sqrt(rmse / static_cast<double>(inlier_number));
-	LOG(INFO) << "RMSE error = " << rmse << " px";
+	std::cout  << "RMSE error = " << rmse << " px";
 
 	// Visualization part.
 	// Inliers are selected using threshold and the estimated model. 
 	// This part is not necessary and is only for visualization purposes. 
 	if (draw_results_)
 	{
-		LOG(INFO) << "To draw the results, an adaptive inlier selection strategy is applied since MAGSAC and MAGSAC++ do not make a strict inlier-outlier decision. " 
+		std::cout  << "To draw the results, an adaptive inlier selection strategy is applied since MAGSAC and MAGSAC++ do not make a strict inlier-outlier decision. " 
 			<< "The selection technique is currently submitted to a journal, more details will come, hopefully, soon.";
 
 		std::vector<int> obtained_labeling(points.rows, 0);
@@ -677,7 +674,7 @@ void testFundamentalMatrixFitting(
 		for (const auto& inlierIdx : selectedInliers)
 			obtained_labeling[inlierIdx] = 1;
 
-		LOG(INFO) << static_cast<int>(selectedInliers.size()) << " inliers are selected adaptively. " <<
+		std::cout  << static_cast<int>(selectedInliers.size()) << " inliers are selected adaptively. " <<
 			"The threshold which selects them is " << bestThreshold << " px";
 
 		// Draw the matches to the images
@@ -707,7 +704,7 @@ void testHomographyFitting(
 	double drawing_threshold_) // The threshold used for visualizing the results
 {
 	// Print the name of the current test scene
-	LOG(INFO) << "Processed scene = '" << test_scene_ << "'.";
+	std::cout  << "Processed scene = '" << test_scene_ << "'.";
 
 	// Load the images of the current test scene
 	cv::Mat image1 = cv::imread("../data/homography/" + test_scene_ + "A.png");
@@ -721,7 +718,7 @@ void testHomographyFitting(
 	// If the images have not been loaded, return
 	if (image1.cols == 0 || image2.cols == 0)
 	{
-		LOG(ERROR) << "A problem occured when loading the images for test scene " << test_scene_ << ".";
+		std::cerr << "A problem occured when loading the images for test scene " << test_scene_ << ".";
 		return;
 	}
 
@@ -738,7 +735,7 @@ void testHomographyFitting(
 
 	if (point_number == 0) // If there are no points, return
 	{
-		LOG(ERROR) << "A problem occured when loading the annotated points for test scene " << test_scene_ << ".";
+		std::cerr << "A problem occured when loading the annotated points for test scene " << test_scene_ << ".";
 		return;
 	}
 
@@ -764,10 +761,10 @@ void testHomographyFitting(
 
 	const size_t reference_inlier_number = ground_truth_inliers.size();
 
-	LOG(INFO) << "Estimated model = homography";
-	LOG(INFO) << "Number of correspondences loaded = " << static_cast<int>(point_number);
-	LOG(INFO) << "Number of ground truth inliers = " << static_cast<int>(reference_inlier_number);
-	LOG(INFO) << "Theoretical RANSAC iteration number at " << ransac_confidence_ << " confidence = " <<
+	std::cout  << "Estimated model = homography";
+	std::cout  << "Number of correspondences loaded = " << static_cast<int>(point_number);
+	std::cout  << "Number of ground truth inliers = " << static_cast<int>(reference_inlier_number);
+	std::cout  << "Theoretical RANSAC iteration number at " << ransac_confidence_ << " confidence = " <<
 		static_cast<int>(log(1.0 - ransac_confidence_) / log(1.0 - pow(static_cast<double>(reference_inlier_number) / static_cast<double>(point_number), 4)));
 
 	// Initialize the sampler used for selecting minimal samples
@@ -806,8 +803,8 @@ void testHomographyFitting(
 	std::chrono::duration<double> elapsed_seconds = end - start; 
 	std::time_t end_time = std::chrono::system_clock::to_time_t(end);
 
-	LOG(INFO) << "Actual number of iterations drawn by MAGSAC at " << ransac_confidence_ << " confidence = " << iteration_number;
-	LOG(INFO) << "Elapsed time = " << elapsed_seconds.count() << " seconds";
+	std::cout  << "Actual number of iterations drawn by MAGSAC at " << ransac_confidence_ << " confidence = " << iteration_number;
+	std::cout  << "Elapsed time = " << elapsed_seconds.count() << " seconds";
 
 	if (model.descriptor.size() == 0)
 	{
@@ -823,14 +820,14 @@ void testHomographyFitting(
 	for (const auto& inlier_idx : ground_truth_inliers)
 		rmse += estimator.squaredResidual(points.row(inlier_idx), model);
 	rmse = sqrt(rmse / static_cast<double>(reference_inlier_number));
-	LOG(INFO) << "RMSE error = " << rmse << " px";
+	std::cout  << "RMSE error = " << rmse << " px";
 	
 	// Visualization part.
 	// Inliers are selected using threshold and the estimated model. 
 	// This part is not necessary and is only for visualization purposes. 
 	if (draw_results_)
 	{
-		LOG(INFO) << "To draw the results, an adaptive inlier selection strategy is applied since MAGSAC and MAGSAC++ do not make a strict inlier-outlier decision. " 
+		std::cout  << "To draw the results, an adaptive inlier selection strategy is applied since MAGSAC and MAGSAC++ do not make a strict inlier-outlier decision. " 
 			<< "The selection technique is currently submitted to a journal, more details will come, hopefully, soon.";
 			
 		MostSimilarInlierSelector< magsac::utils::DefaultHomographyEstimator> 
@@ -845,7 +842,7 @@ void testHomographyFitting(
 			selectedInliers,
 			bestThreshold);
 
-		LOG(INFO) << static_cast<int>(selectedInliers.size()) << " inliers are selected adaptively. " <<
+		std::cout  << static_cast<int>(selectedInliers.size()) << " inliers are selected adaptively. " <<
 			"The threshold which selects them is " << bestThreshold << " px";
 
 		// The labeling implied by the estimated model and the drawing threshold
@@ -885,7 +882,7 @@ void opencvHomographyFitting(
 	const bool with_magsac_post_processing_)
 {
 	// Print the name of the current scene
-	LOG(INFO) << "Processed scene = '" << test_scene_ << "'.";
+	std::cout  << "Processed scene = '" << test_scene_ << "'.";
 
 	// Load the images of the current test scene
 	cv::Mat image1 = cv::imread("../data/homography/" + test_scene_ + "A.png");
@@ -899,7 +896,7 @@ void opencvHomographyFitting(
 	// If the images have not been loaded, return
 	if (image1.cols == 0 || image2.cols == 0)
 	{
-		LOG(ERROR) << "A problem occured when loading the images for test scene " << test_scene_ << ".";
+		std::cerr << "A problem occured when loading the images for test scene " << test_scene_ << ".";
 		return;
 	}
 
@@ -916,7 +913,7 @@ void opencvHomographyFitting(
 
 	if (point_number == 0) // If there are no points, return
 	{
-		LOG(ERROR) << "A problem occured when loading the annotated points for test scene " << test_scene_ << ".";
+		std::cerr << "A problem occured when loading the annotated points for test scene " << test_scene_ << ".";
 		return;
 	}
 
@@ -945,9 +942,9 @@ void opencvHomographyFitting(
 	// The number of reference inliers
 	const size_t reference_inlier_number = ground_truth_inliers.size();
 
-	LOG(INFO) << "Estimated model = homography";
-	LOG(INFO) << "Number of correspondences loaded = " << static_cast<int>(point_number);
-	LOG(INFO) << "Number of ground truth inliers = " << static_cast<int>(reference_inlier_number);
+	std::cout  << "Estimated model = homography";
+	std::cout  << "Number of correspondences loaded = " << static_cast<int>(point_number);
+	std::cout  << "Number of ground truth inliers = " << static_cast<int>(reference_inlier_number);
 
 	// Define location of sub matrices in data matrix
 	cv::Rect roi1(0, 0, 2, point_number); // The ROI of the points in the source image
@@ -977,13 +974,13 @@ void opencvHomographyFitting(
 	std::chrono::duration<double> elapsed_seconds = end - start;
 
 	// Print the processing time
-	LOG(INFO) << "Elapsed time = " << elapsed_seconds.count() << " seconds";
+	std::cout  << "Elapsed time = " << elapsed_seconds.count() << " seconds";
 
 	// Applying the MAGSAC post-processing step using the OpenCV's output
 	// as the input.
 	if (with_magsac_post_processing_)
 	{
-		LOG(ERROR) << "Post-processing is not implemented yet.";
+		std::cerr << "Post-processing is not implemented yet.";
 	}
 	 
 	// Compute the root mean square error (RMSE) using the ground truth inliers
@@ -995,7 +992,7 @@ void opencvHomographyFitting(
 	rmse = std::sqrt(rmse / reference_inlier_number);
 
 	// Print the RMSE error
-	LOG(INFO) << "RMSE error = " << rmse << " px";
+	std::cout  << "RMSE error = " << rmse << " px";
 
 	// Visualization part.
 	// Inliers are selected using threshold and the estimated model. 
@@ -1034,7 +1031,7 @@ void opencvFundamentalMatrixFitting(
 	const bool with_magsac_post_processing_)
 {
 	// Print the name of the current test scene
-	LOG(INFO) << "Processed scene = '" << test_scene_ << "'.";
+	std::cout  << "Processed scene = '" << test_scene_ << "'.";
 
 	// Load the images of the current test scene
 	cv::Mat image1 = cv::imread("../data/fundamental_matrix/" + test_scene_ + "A.png");
@@ -1048,7 +1045,7 @@ void opencvFundamentalMatrixFitting(
 	// If the images are not loaded, return
 	if (image1.cols == 0 || image2.cols == 0)
 	{
-		LOG(ERROR) << "A problem occured when loading the images for test scene " << test_scene_ << ".";
+		std::cerr << "A problem occured when loading the images for test scene " << test_scene_ << ".";
 		return;
 	}
 
@@ -1065,7 +1062,7 @@ void opencvFundamentalMatrixFitting(
 
 	if (point_number == 0) // If there are no points, return
 	{
-		LOG(ERROR) << "A problem occured when loading the annotated points for test scene " << test_scene_ << ".";
+		std::cerr << "A problem occured when loading the annotated points for test scene " << test_scene_ << ".";
 		return;
 	}
 
@@ -1096,9 +1093,9 @@ void opencvFundamentalMatrixFitting(
 	// Number of inliers in the reference labeling
 	const size_t reference_inlier_number = ground_truth_inliers.size();
 	 
-	LOG(INFO) << "Estimated model = fundamental matrix";
-	LOG(INFO) << "Number of correspondences loaded = " << static_cast<int>(point_number);
-	LOG(INFO) << "Number of ground truth inliers = " << static_cast<int>(reference_inlier_number);
+	std::cout  << "Estimated model = fundamental matrix";
+	std::cout  << "Number of correspondences loaded = " << static_cast<int>(point_number);
+	std::cout  << "Number of ground truth inliers = " << static_cast<int>(reference_inlier_number);
 
 	// Define location of sub matrices in data matrix
 	cv::Rect roi1( 0, 0, 2, point_number ); // The ROI of the points in the source image
@@ -1126,13 +1123,13 @@ void opencvFundamentalMatrixFitting(
 	Eigen::Matrix3d fundamental_matrix =
 		Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(cv_fundamental_matrix.ptr<double>(), 3, 3);
 
-	LOG(INFO) << "Elapsed time = " << elapsed_seconds.count() << " seconds";
+	std::cout  << "Elapsed time = " << elapsed_seconds.count() << " seconds";
 
 	// Applying the MAGSAC post-processing step using the OpenCV's output
 	// as the input.
 	if (with_magsac_post_processing_)
 	{		
-		LOG(ERROR) << "Post-processing is not implemented yet.";
+		std::cerr << "Post-processing is not implemented yet.";
 	}
 	 
 	// Compute the RMSE given the ground truth inliers
@@ -1146,7 +1143,7 @@ void opencvFundamentalMatrixFitting(
 	}
 	
 	rmse = sqrt(rmse / static_cast<double>(reference_inlier_number));
-	LOG(INFO) << "RMSE error = " << rmse << " px";
+	std::cout  << "RMSE error = " << rmse << " px";
 
 	// Visualization part.
 	// Inliers are selected using threshold and the estimated model. 
@@ -1178,7 +1175,7 @@ void opencvEssentialMatrixFitting(
 	const std::string &test_scene_,
 	bool draw_results_)
 {
-	LOG(INFO) << "Processed scene = '" << test_scene_ << "'.";
+	std::cout  << "Processed scene = '" << test_scene_ << "'.";
 
 	// Load the images of the current test scene
 	cv::Mat image1 = cv::imread("../data/essential_matrix/" + test_scene_ + "1.png");
@@ -1191,7 +1188,7 @@ void opencvEssentialMatrixFitting(
 
 	if (image1.cols == 0)
 	{
-		LOG(ERROR) << "A problem occured when loading the images for test scene " << test_scene_ << ".";
+		std::cerr << "A problem occured when loading the images for test scene " << test_scene_ << ".";
 		return;
 	}
 
@@ -1208,7 +1205,7 @@ void opencvEssentialMatrixFitting(
 	if (!gcransac::utils::loadMatrix<double, 3, 3>(source_intrinsics_path,
 		intrinsics_source))
 	{
-		LOG(ERROR) << "An error occured when loading the intrinsics camera matrix from " << source_intrinsics_path << ".";
+		std::cerr << "An error occured when loading the intrinsics camera matrix from " << source_intrinsics_path << ".";
 		return;
 	}
 
@@ -1216,7 +1213,7 @@ void opencvEssentialMatrixFitting(
 	if (!gcransac::utils::loadMatrix<double, 3, 3>(destination_intrinsics_path,
 		intrinsics_destination))
 	{
-		LOG(ERROR) << "An error occured when loading the intrinsics camera matrix from " << destination_intrinsics_path << ".";
+		std::cerr << "An error occured when loading the intrinsics camera matrix from " << destination_intrinsics_path << ".";
 		return;
 	}
 
@@ -1270,7 +1267,7 @@ void opencvEssentialMatrixFitting(
 	// Calculate the processing time of OpenCV
 	std::chrono::duration<double> elapsed_seconds = end - start;
 	
-	LOG(INFO) << "Elapsed time = " << elapsed_seconds.count() << " seconds";
+	std::cout  << "Elapsed time = " << elapsed_seconds.count() << " seconds";
 
 	size_t inlier_number = 0;
 	
@@ -1282,7 +1279,7 @@ void opencvEssentialMatrixFitting(
 			++inlier_number;
 	}
 
-	LOG(INFO) << "Number of points closer than " << threshold_ << " is " << static_cast<int>(inlier_number);
+	std::cout  << "Number of points closer than " << threshold_ << " is " << static_cast<int>(inlier_number);
 
 	if (draw_results_)
 	{

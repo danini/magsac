@@ -86,7 +86,6 @@ An example comparing different samplers on fundamental matrix estimation is avai
 - OpenCV 3.0 or higher
 - A modern compiler with C++17 support
 - GFlags
-- GLOG
 
 # Performance of MAGSAC++
 

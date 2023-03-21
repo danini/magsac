@@ -49,27 +49,6 @@ if(DEFINED gflags_VERSION_STRING OR DEFINED GFLAGS_VERSION_STRING)
 endif()
 
 # ==============================================================================
-# Find GLOG
-# ==============================================================================
-find_package(Glog REQUIRED)
-if(NOT Glog_FOUND)
-	message(FATAL_ERROR "Glog not found.")
-else()
-	message("Glog library found.")
-endif()
-
-if(IS_MSVC)
-    # Some fixes for the Glog library.
-    add_definitions("-DGLOG_NO_ABBREVIATED_SEVERITIES")
-    add_definitions("-DGL_GLEXT_PROTOTYPES")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
-    # Enable object level parallel builds in Visual Studio.
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /MP")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
-endif()
-
-
-# ==============================================================================
 # Find Eigen
 # ==============================================================================
 find_package(Eigen3 REQUIRED)
@@ -117,7 +96,6 @@ add_library(GraphCutRANSAC STATIC
 target_link_libraries(GraphCutRANSAC
 	${OpenCV_LIBS}
 	Eigen3::Eigen
-	glog
 	gflags)
 
 # ==============================================================================
@@ -153,7 +131,6 @@ target_link_libraries(pymagsac PRIVATE
 	${OpenCV_LIBS} 
 	Eigen3::Eigen
 	GraphCutRANSAC
-	glog
 	gflags)
 
 add_library(${PROJECT_NAME} STATIC 
@@ -164,7 +141,6 @@ target_link_libraries(${PROJECT_NAME}
 	${OpenCV_LIBS}
 	Eigen3::Eigen
 	GraphCutRANSAC
-	glog
 	gflags
 )
 
@@ -184,7 +160,6 @@ if (CREATE_SAMPLE_PROJECT)
 		${OpenCV_LIBS}
 		Eigen3::Eigen
 		GraphCutRANSAC
-		glog
 		gflags
 	)
 
