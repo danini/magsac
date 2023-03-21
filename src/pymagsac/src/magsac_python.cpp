@@ -447,8 +447,7 @@ int findEssentialMatrix_(std::vector<double>& correspondences,
     if (num_inliers > 5)
     {   
         std::vector<gcransac::Model> models = { model };
-		gcransac::estimator::solver::EssentialMatrixBundleAdjustmentSolver bundleOptimizer(
-            pose_lib::BundleOptions::LossType::CAUCHY);
+		gcransac::estimator::solver::EssentialMatrixBundleAdjustmentSolver bundleOptimizer;
 		bundleOptimizer.estimateModel(
 			normalized_points,
 			&inlier_indices[0],
