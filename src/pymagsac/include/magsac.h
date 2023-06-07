@@ -238,19 +238,42 @@ bool MAGSAC<DatumType, ModelEstimator>::run(
 			if (!sampler_.sample(pool, // The index pool from which the minimal sample can be selected
 				minimal_sample.get(), // The minimal sample
 				sample_size)) // The size of a minimal sample
+			{
+				// Updating the sampler
+				sampler_.update(
+					minimal_sample.get(),
+					sample_size,
+					iteration,
+					0.0);
 				continue;
+			}
 
 			// Check if the selected sample is valid before estimating the model
 			// parameters which usually takes more time. 
 			if (!estimator_.isValidSample(points_, // All points
 				minimal_sample.get())) // The current sample
+			{
+				// Updating the sampler
+				sampler_.update(
+					minimal_sample.get(),
+					sample_size,
+					iteration,
+					0.0);
 				continue;
+			}
 
 			// Estimate the model from the minimal sample
  			if (estimator_.estimateModel(points_, // All data points
 				minimal_sample.get(), // The selected minimal sample
 				&models)) // The estimated models
 				break; 
+
+			// Updating the sampler
+			sampler_.update(
+				minimal_sample.get(),
+				sample_size,
+				iteration,
+				0.0);
 		}         
 
 		// If the method was not able to generate any usable models, break the cycle.
@@ -294,6 +317,13 @@ bool MAGSAC<DatumType, ModelEstimator>::run(
 				max_iteration = MIN(max_iteration, last_iteration_number); // Update the max iteration number, but do not allow to increase
 			}
 		}
+
+		// Updating the sampler
+		sampler_.update(
+			minimal_sample.get(),
+			sample_size,
+			iteration,
+			0.0);
 
 		// Update the time parameters if a time limit is set
 		if (desired_fps > -1)
