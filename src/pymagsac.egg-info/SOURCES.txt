@@ -1,0 +1,9 @@
+LICENSE
+README.md
+setup.py
+src/pymagsac/__init__.py
+src/pymagsac.egg-info/PKG-INFO
+src/pymagsac.egg-info/SOURCES.txt
+src/pymagsac.egg-info/dependency_links.txt
+src/pymagsac.egg-info/not-zip-safe
+src/pymagsac.egg-info/top_level.txt
