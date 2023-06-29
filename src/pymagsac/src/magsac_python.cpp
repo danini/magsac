@@ -473,6 +473,123 @@ int findEssentialMatrix_(std::vector<double>& correspondences,
     return num_inliers;
 }
 
+int findLine2D_(std::vector<double>& pointsArr,
+    std::vector<bool>& inliers,
+    std::vector<double>& line,
+    std::vector<double>& inlier_probabilities,
+    double imageWidth,
+    double imageHeight,
+    int sampler_id,
+    bool use_magsac_plus_plus,
+    double sigma_max,
+    double conf,
+    int min_iters,
+    int max_iters,
+    int partition_num)
+{
+    magsac::utils::Default2DLineEstimator estimator; // The robust homography estimator class containing the function for the fitting and residual calculation
+    gcransac::Homography model; // The estimated model
+
+    MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>* magsac;
+    if (use_magsac_plus_plus)
+        magsac = new MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>(
+            MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>::MAGSAC_PLUS_PLUS);
+    else
+        magsac = new MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>(
+            MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>::MAGSAC_ORIGINAL);
+
+    magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
+    magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
+    magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
+    magsac->setIterationLimit(max_iters);
+	magsac->setMinimumIterationNumber(min_iters);
+
+	ModelScore score;
+	
+    int num_tents = pointsArr.size() / 2;
+    cv::Mat points(num_tents, 2, CV_64F, &pointsArr[0]);
+	
+	// Initialize the samplers
+	// The main sampler is used for sampling in the main RANSAC loop
+	typedef gcransac::sampler::Sampler<cv::Mat, size_t> AbstractSampler;
+	std::unique_ptr<AbstractSampler> main_sampler;
+	if (sampler_id == 0) // Initializing a RANSAC-like uniformly random sampler
+		main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::UniformSampler(&points));
+	else if (sampler_id == 1)  // Initializing a PROSAC sampler. This requires the points to be ordered according to the quality.
+		main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProsacSampler(&points, estimator.sampleSize()));
+	else if (sampler_id == 2) // Initializing a Progressive NAPSAC sampler
+		main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProgressiveNapsacSampler<2>(&points,
+			{ 16, 8, 4, 2 },	// The layer of grids. The cells of the finest grid are of dimension 
+								// (source_image_width / 16) * (source_image_height / 16)  * (destination_image_width / 16)  (destination_image_height / 16), etc.
+			estimator.sampleSize(), // The size of a minimal sample
+			{ static_cast<double>(imageWidth), // The width of the source image
+				static_cast<double>(imageHeight) }, // The height of the source image
+			0.5)); // The length (i.e., 0.5 * <point number> iterations) of fully blending to global sampling 
+	else if (sampler_id == 3)
+		main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ImportanceSampler(&points, 
+            inlier_probabilities,
+            estimator.sampleSize()));
+	else if (sampler_id == 4)
+    {
+		double variance = 0.1;
+        double max_prob = 0;
+        for (const auto &prob : inlier_probabilities)
+            max_prob = MAX(max_prob, prob);
+        for (auto &prob : inlier_probabilities)
+            prob /= max_prob;
+		main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::AdaptiveReorderingSampler(&points, 
+            inlier_probabilities,
+            estimator.sampleSize(),
+            variance));
+	}
+	else
+	{
+		fprintf(stderr, "Unknown sampler identifier: %d. The accepted samplers are 0 (uniform sampling), 1 (PROSAC sampling), 2 (P-NAPSAC sampling), 3 (NG-RANSAC sampler), 4 (AR-Sampler)\n",
+			sampler_id);
+		return 0;
+	}
+
+    bool success = magsac->run(points, // The data points
+        conf, // The required confidence in the results
+        estimator, // The used estimator
+        *main_sampler.get(), // The sampler used for selecting minimal samples in each iteration
+        model, // The estimated model
+        max_iters, // The number of iterations
+        score); // The score of the estimated model
+
+    inliers.resize(num_tents);
+    if (!success) 
+    {
+        for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx)
+            inliers[pt_idx] = false;
+        line.resize(3);
+        for (int i = 0; i < 3; i++)
+            line[i] = 0;
+        return 0;
+    }
+
+    int num_inliers = 0;
+    for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx) 
+    {
+        const int is_inlier = sqrt(estimator.residual(points.row(pt_idx), model.descriptor)) <= sigma_max;
+        inliers[pt_idx] = (bool)is_inlier;
+        num_inliers += is_inlier;
+    }
+    
+    line.resize(3);
+    for (int i = 0; i < 3; i++){
+        line[i] = (double)model.descriptor(i);
+    }
+
+	// It is ugly: the unique_ptr does not check for virtual descructors in the base class.
+	// Therefore, the derived class's objects are not deleted automatically. 
+	// This causes a memory leaking. I hate C++.
+	AbstractSampler *sampler_ptr = main_sampler.release();
+	delete sampler_ptr;
+
+    return num_inliers;
+}
+
 int findHomography_(std::vector<double>& correspondences,
                     std::vector<bool>& inliers,
                     std::vector<double>& H,

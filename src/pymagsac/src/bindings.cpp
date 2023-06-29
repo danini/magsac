@@ -321,21 +321,91 @@ py::tuple findEssentialMatrix(
         ptr2[i] = E[i];
     return py::make_tuple(E_, inliers_);
 }
-                                
+
+py::tuple findLine2D(
+    py::array_t<double> points_,
+    double w1, 
+    double h1,
+    py::array_t<double> probabilities_,
+    int sampler,
+    bool use_magsac_plus_plus,
+    double sigma_th,
+    double conf,
+    int min_iters,
+    int max_iters,
+    int partition_num) 
+{
+    py::buffer_info buf1 = points_.request();
+	size_t NUM_TENTS = buf1.shape[0];
+	size_t DIM = buf1.shape[1];
+
+	if (DIM != 2) 
+		throw std::invalid_argument("The points should be an array with dims [n,2], n>=2");
+    if (NUM_TENTS < 2) 
+        throw std::invalid_argument("The points should be an array with dims [n,2], n>=2");
+
+    double* ptr1 = (double*)buf1.ptr;
+    std::vector<double> points;
+    points.assign(ptr1, ptr1 + buf1.size);
+    
+    std::vector<double> line2d(3);
+    std::vector<bool> inliers(NUM_TENTS);
+
+    std::vector<double> probabilities;
+    if (sampler == 3 || sampler == 4)
+    {
+        py::buffer_info buf_prob = probabilities_.request();
+        double* ptr_prob = (double*)buf_prob.ptr;
+        probabilities.assign(ptr_prob, ptr_prob + buf_prob.size);        
+    }
+    
+    int num_inl = findLine2D_(
+        points,
+        inliers,
+        line2d,
+        probabilities,
+        w1,
+        h1,
+        sampler,
+        use_magsac_plus_plus,
+        sigma_th,
+        conf,
+        min_iters,
+        max_iters,
+        partition_num);
+    
+    py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
+    py::buffer_info buf3 = inliers_.request();
+    bool *ptr3 = (bool *)buf3.ptr;
+    for (size_t i = 0; i < NUM_TENTS; i++)
+        ptr3[i] = inliers[i];   
+    
+    if (num_inl  == 0){
+        return py::make_tuple(pybind11::cast<pybind11::none>(Py_None),inliers_);
+    }
+    py::array_t<double> line_ = py::array_t<double>({3});
+    py::buffer_info buf2 = line_.request();
+    double *ptr2 = (double *)buf2.ptr;
+    for (size_t i = 0; i < 3; i++)
+        ptr2[i] = line2d[i];
+    
+    return py::make_tuple(line_, inliers_);
+}
+
 py::tuple findHomography(
-	                     py::array_t<double>  correspondences_,
-                         double w1, 
-                         double h1,
-                         double w2,
-                         double h2,
-                         py::array_t<double>  probabilities_,
-                         int sampler,
-						 bool use_magsac_plus_plus,
-                         double sigma_th,
-                         double conf,
-                         int min_iters,
-                         int max_iters,
-                         int partition_num) 
+    py::array_t<double>  correspondences_,
+    double w1, 
+    double h1,
+    double w2,
+    double h2,
+    py::array_t<double>  probabilities_,
+    int sampler,
+    bool use_magsac_plus_plus,
+    double sigma_th,
+    double conf,
+    int min_iters,
+    int max_iters,
+    int partition_num) 
 {
 	py::buffer_info buf1 = correspondences_.request();
 	size_t NUM_TENTS = buf1.shape[0];
@@ -472,6 +542,19 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("h2"),
         py::arg("probabilities"),
 		py::arg("sampler") = 4,
+        py::arg("use_magsac_plus_plus") = true,
+        py::arg("sigma_th") = 1.0,
+        py::arg("conf") = 0.99,
+        py::arg("min_iters") = 50,
+        py::arg("max_iters") = 1000,
+        py::arg("partition_num") = 5); 
+
+  m.def("findLine2D", &findLine2D, R"doc(some doc)doc",
+        py::arg("points"),
+        py::arg("w1"),
+        py::arg("h1"),
+        py::arg("probabilities"),
+		py::arg("sampler") = 0,
         py::arg("use_magsac_plus_plus") = true,
         py::arg("sigma_th") = 1.0,
         py::arg("conf") = 0.99,
