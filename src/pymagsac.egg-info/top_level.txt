@@ -1,2 +1,0 @@
-pymagsac
-pymagsac/pymagsac
