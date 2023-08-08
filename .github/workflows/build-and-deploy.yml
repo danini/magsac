@@ -79,5 +79,5 @@ jobs:
 
       - uses: actions/upload-artifact@v3
         with:
-          name: pygcransac-wheels-${{ runner.os }}
+          name: pymagsac-wheels-${{ runner.os }}
           path: ./wheelhouse/*.whl
