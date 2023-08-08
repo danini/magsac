@@ -1,0 +1,31 @@
+[build-system]
+requires = [
+    "setuptools>=42",
+    "wheel",
+    "cmake>=3.18",
+    "scikit-build>=0.13",
+    "ninja>=1.10.0",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = 'tests'
+
+[tool.cibuildwheel]
+archs = ["auto64"]  # 64-bit only
+build = "cp38-* cp39-* cp310-* cp311-*"  # Only build Python 3.8-3.11 wheels
+skip = ["pp*", "*musllinux*"]  # disable PyPy and musl-based wheels
+manylinux-x86_64-image = "ghcr.io/akaszynski/manylinux2014-centos7-opencv/manylinux2014_x86_64_opencv3:v3.4.5.1"
+test-requires = "pytest"
+test-command = "pytest {project}/tests"
+
+[tool.cibuildwheel.linux]
+before-build = "yum update -y && yum install gflags-devel -y"
+
+[tool.cibuildwheel.windows]
+# Use delvewheel on windows
+before-build = "pip install delvewheel"
+
+# manually specify the following, replacing path with the location of opencv
+# CIBW_ENVIRONMENT_WINDOWS "OpenCV_DIR='<PATH>/opencv'"
+# CIBW_REPAIR_WHEEL_COMMAND_WINDOWS "delvewheel repair -w {dest_dir} {wheel} --add-path <PATH>/opencv/build/bin"

@@ -1,0 +1,70 @@
+name: Build and upload
+
+on:
+  pull_request:
+  push:
+    tags:
+      - "*"
+    branches:
+      - "master"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+
+      - name: Setup MSVC Developer Command Prompt
+        if: matrix.os == 'windows-latest'
+        uses: TheMrMilchmann/setup-msvc-dev@v2.0.1
+        with:
+          arch: x64
+          toolset: 14.36.32532
+
+      - name: Cache OpenCV build
+        if: matrix.os == 'windows-latest'
+        id: cache-opencv
+        uses: actions/cache@v3
+        with:
+          path: D:/a/graph-cut-ransac/graph-cut-ransac/opencv
+          key: opencv3-4-5-${{ runner.os }}-${{ hashFiles('scripts/build-opencv.ps1') }}
+
+      - name: Build OpenCV on Windows
+        if: matrix.os == 'windows-latest' && steps.cache-opencv.outputs.cache-hit != 'true'
+        run: scripts/build-opencv.ps1
+        shell: pwsh
+
+      - name: Cache Eigen3 build
+        if: matrix.os == 'windows-latest'
+        id: cache-eigen3
+        uses: actions/cache@v3
+        with:
+          path: C:/eigen3
+          key: opencv-${{ runner.os }}-${{ hashFiles('scripts/build-eigen3.ps1') }}
+
+      - name: Install Eigen3 on Windows
+        if: matrix.os == 'windows-latest' && steps.cache-eigen3.outputs.cache-hit != 'true'
+        run: scripts/build-eigen3.ps1
+        shell: pwsh
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.14.1
+        env:
+          CIBW_ENVIRONMENT_WINDOWS: 'OpenCV_DIR="D:/a/graph-cut-ransac/graph-cut-ransac/opencv/build" Eigen3_DIR="C:/eigen3"'
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair -w {dest_dir} {wheel} --add-path D:/a/graph-cut-ransac/graph-cut-ransac/opencv/build/bin"
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: pygcransac-wheels-${{ runner.os }}
+          path: ./wheelhouse/*.whl
