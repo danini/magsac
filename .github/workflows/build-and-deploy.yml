@@ -42,7 +42,7 @@ jobs:
 
       - name: Build OpenCV on Windows
         if: matrix.os == 'windows-latest' && steps.cache-opencv.outputs.cache-hit != 'true'
-        run: scripts/build-opencv.ps1
+        run: graph-cut-ransac/scripts/build-opencv.ps1
         shell: pwsh
 
       - name: Cache Eigen3 build
@@ -55,7 +55,7 @@ jobs:
 
       - name: Install Eigen3 on Windows
         if: matrix.os == 'windows-latest' && steps.cache-eigen3.outputs.cache-hit != 'true'
-        run: scripts/build-eigen3.ps1
+        run: graph-cut-ransac/scripts/build-eigen3.ps1
         shell: pwsh
 
       - name: Cache gflags build
