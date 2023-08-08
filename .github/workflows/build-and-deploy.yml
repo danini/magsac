@@ -37,7 +37,7 @@ jobs:
         id: cache-opencv
         uses: actions/cache@v3
         with:
-          path: D:/a/graph-cut-ransac/graph-cut-ransac/opencv
+          path: D:/a/magsac/magsac/opencv
           key: opencv3-4-5-${{ runner.os }}-${{ hashFiles('scripts/build-opencv.ps1') }}
 
       - name: Build OpenCV on Windows
@@ -58,11 +58,24 @@ jobs:
         run: scripts/build-eigen3.ps1
         shell: pwsh
 
+      - name: Cache gflags build
+        if: matrix.os == 'windows-latest'
+        id: cache-gflags
+        uses: actions/cache@v3
+        with:
+          path: D:/a/magsac/magsac/gflags/build_
+          key: opencv-${{ runner.os }}-${{ hashFiles('scripts/build-eigen3.ps1') }}
+
+      - name: Build gflags on Windows
+        if: matrix.os == 'windows-latest' && steps.cache-gflags.outputs.cache-hit != 'true'
+        run: scripts/build-gflags.ps1
+        shell: pwsh
+
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.14.1
         env:
-          CIBW_ENVIRONMENT_WINDOWS: 'OpenCV_DIR="D:/a/graph-cut-ransac/graph-cut-ransac/opencv/build" Eigen3_DIR="C:/eigen3"'
-          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair -w {dest_dir} {wheel} --add-path D:/a/graph-cut-ransac/graph-cut-ransac/opencv/build/bin"
+          CIBW_ENVIRONMENT_WINDOWS: 'OpenCV_DIR="D:/a/magsac/magsac/opencv/build" Eigen3_DIR="C:/eigen3" gflags_DIR=D:/a/magsac/magsac/gflags/build_'
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair -w {dest_dir} {wheel} --add-path D:/a/magsac/magsac/opencv/build/bin"
 
       - uses: actions/upload-artifact@v3
         with:
