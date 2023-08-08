@@ -347,3 +347,8 @@ MigrationBackup/
 # Specific to this report
 results/*
 build
+
+# pip and python build
+*.egg-info*
+wheelhouse
+dist
