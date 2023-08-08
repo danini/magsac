@@ -32,13 +32,26 @@ jobs:
           arch: x64
           toolset: 14.36.32532
 
+      - name: Cache gflags build
+        if: matrix.os == 'windows-latest'
+        id: cache-gflags
+        uses: actions/cache@v3
+        with:
+          path: D:/a/magsac/magsac/gflags/build_
+          key: opencv-${{ runner.os }}-${{ hashFiles('scripts/build-gflags.ps1') }}
+
+      - name: Build gflags on Windows
+        if: matrix.os == 'windows-latest' && steps.cache-gflags.outputs.cache-hit != 'true'
+        run: scripts/build-gflags.ps1
+        shell: pwsh
+
       - name: Cache OpenCV build
         if: matrix.os == 'windows-latest'
         id: cache-opencv
         uses: actions/cache@v3
         with:
           path: D:/a/magsac/magsac/opencv
-          key: opencv3-4-5-${{ runner.os }}-${{ hashFiles('scripts/build-opencv.ps1') }}
+          key: opencv3-4-5-${{ runner.os }}-${{ hashFiles('graph-cut-ransac/scripts/build-opencv.ps1') }}
 
       - name: Build OpenCV on Windows
         if: matrix.os == 'windows-latest' && steps.cache-opencv.outputs.cache-hit != 'true'
@@ -51,24 +64,11 @@ jobs:
         uses: actions/cache@v3
         with:
           path: C:/eigen3
-          key: opencv-${{ runner.os }}-${{ hashFiles('scripts/build-eigen3.ps1') }}
+          key: eigen3-${{ runner.os }}-${{ hashFiles('graph-cut-ransac/scripts/build-eigen3.ps1') }}
 
       - name: Install Eigen3 on Windows
         if: matrix.os == 'windows-latest' && steps.cache-eigen3.outputs.cache-hit != 'true'
         run: graph-cut-ransac/scripts/build-eigen3.ps1
-        shell: pwsh
-
-      - name: Cache gflags build
-        if: matrix.os == 'windows-latest'
-        id: cache-gflags
-        uses: actions/cache@v3
-        with:
-          path: D:/a/magsac/magsac/gflags/build_
-          key: opencv-${{ runner.os }}-${{ hashFiles('scripts/build-eigen3.ps1') }}
-
-      - name: Build gflags on Windows
-        if: matrix.os == 'windows-latest' && steps.cache-gflags.outputs.cache-hit != 'true'
-        run: scripts/build-gflags.ps1
         shell: pwsh
 
       - name: Build wheels
