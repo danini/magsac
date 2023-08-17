@@ -1,0 +1,8 @@
+# Exclude directories
+global-exclude tests/*
+global-exclude build/*
+
+include CMakeLists.txt
+recursive-include graph-cut-ransac/lib *
+recursive-include graph-cut-ransac/src *
+recursive-include lib/ *
