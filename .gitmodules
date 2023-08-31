@@ -1,3 +1,6 @@
 [submodule "lib/pybind11"]
 	path = lib/pybind11
 	url = https://github.com/pybind/pybind11.git
+[submodule "graph-cut-ransac"]
+	path = graph-cut-ransac
+	url = https://github.com/danini/graph-cut-ransac
