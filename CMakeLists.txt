@@ -144,6 +144,8 @@ target_link_libraries(${PROJECT_NAME}
 	gflags
 )
 
+install(TARGETS pymagsac DESTINATION .)
+
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 	
 # ==============================================================================
@@ -165,4 +167,3 @@ if (CREATE_SAMPLE_PROJECT)
 
 	add_dependencies(SampleProject ${PROJECT_NAME})
 endif (CREATE_SAMPLE_PROJECT)
-

@@ -1,0 +1,135 @@
+name: Build and upload
+
+on:
+  pull_request:
+  push:
+    tags:
+      - "*"
+    branches:
+      - "master"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+
+      - name: Setup MSVC Developer Command Prompt
+        if: matrix.os == 'windows-latest'
+        uses: TheMrMilchmann/setup-msvc-dev@v2.0.1
+        with:
+          arch: x64
+          toolset: 14.36.32532
+
+      - name: Cache gflags build
+        if: matrix.os == 'windows-latest'
+        id: cache-gflags
+        uses: actions/cache@v3
+        with:
+          path: D:/a/magsac/magsac/gflags/build_
+          key: opencv-${{ runner.os }}-${{ hashFiles('scripts/build-gflags.ps1') }}
+
+      - name: Build gflags on Windows
+        if: matrix.os == 'windows-latest' && steps.cache-gflags.outputs.cache-hit != 'true'
+        run: scripts/build-gflags.ps1
+        shell: pwsh
+
+      - name: Cache OpenCV build
+        if: matrix.os == 'windows-latest'
+        id: cache-opencv
+        uses: actions/cache@v3
+        with:
+          path: D:/a/magsac/magsac/opencv
+          key: opencv3-4-5-${{ runner.os }}-${{ hashFiles('graph-cut-ransac/scripts/build-opencv.ps1') }}
+
+      - name: Build OpenCV on Windows
+        if: matrix.os == 'windows-latest' && steps.cache-opencv.outputs.cache-hit != 'true'
+        run: graph-cut-ransac/scripts/build-opencv.ps1
+        shell: pwsh
+
+      - name: Cache Eigen3 build
+        if: matrix.os == 'windows-latest'
+        id: cache-eigen3
+        uses: actions/cache@v3
+        with:
+          path: C:/eigen3
+          key: eigen3-${{ runner.os }}-${{ hashFiles('graph-cut-ransac/scripts/build-eigen3.ps1') }}
+
+      - name: Install Eigen3 on Windows
+        if: matrix.os == 'windows-latest' && steps.cache-eigen3.outputs.cache-hit != 'true'
+        run: graph-cut-ransac/scripts/build-eigen3.ps1
+        shell: pwsh
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.14.1
+        env:
+          CIBW_ENVIRONMENT_WINDOWS: 'OpenCV_DIR="D:/a/magsac/magsac/opencv/build" Eigen3_DIR="C:/eigen3" gflags_DIR=D:/a/magsac/magsac/gflags/build_'
+          CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair -w {dest_dir} {wheel} --add-path D:/a/magsac/magsac/opencv/build/bin"
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: pymagsac-wheels-${{ runner.os }}
+          path: ./wheelhouse/*.whl
+
+  build_sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+
+      - name: Build
+        run: pipx run build --sdist
+
+      - name: Validate
+        run: |
+          pip install twine
+          twine check dist/*
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: pygcransac-sdist
+          path: dist/*.tar.gz
+
+  upload_pypi:
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+    # upload to PyPI on every tag
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+    steps:
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      # Download all artifacts
+      - uses: actions/download-artifact@v3
+
+      - name: Upload to Public PyPi
+        run: |
+          pip install twine
+          twine upload --skip-existing ./**/*.whl
+          twine upload --skip-existing ./**/*.tar.gz
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
+          files: |
+            ./**/*.whl
