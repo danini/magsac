@@ -48,6 +48,8 @@ There are pre-compiled wheels for Windows and Linux for Python 3.8 - 3.11 that y
 pip install magsac
 ```
 
+Thanks to [@akaszynski](https://github.com/akaszynski) for his contributions.
+
 # Installation C++
 
 To build and install C++-only `MAGSAC`/`MAGSAC++`, clone or download this repository and then build the project by CMAKE. 
