@@ -32,6 +32,9 @@ jobs:
           arch: x64
           toolset: 14.36.32532
 
+      - name: Install Ninja
+        run: choco install ninja
+
       - name: Cache OpenCV build
         if: matrix.os == 'windows-latest'
         id: cache-opencv
@@ -57,8 +60,6 @@ jobs:
         if: matrix.os == 'windows-latest' && steps.cache-eigen3.outputs.cache-hit != 'true'
         run: graph-cut-ransac/scripts/build-eigen3.ps1
         shell: pwsh
-
-      - uses: seanmiddleditch/gha-setup-ninja@master
 
       - name: Cache gflags build
         if: matrix.os == 'windows-latest'
