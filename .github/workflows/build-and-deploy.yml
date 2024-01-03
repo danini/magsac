@@ -33,6 +33,7 @@ jobs:
           toolset: 14.36.32532
 
       - name: Install Ninja
+        if: matrix.os == 'windows-latest'
         run: choco install ninja
 
       - name: Cache OpenCV build
