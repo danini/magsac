@@ -30,7 +30,7 @@ jobs:
         uses: TheMrMilchmann/setup-msvc-dev@v2.0.1
         with:
           arch: x64
-          toolset: 14.36.32532
+          toolset: "14"
 
       - name: Cache OpenCV build
         if: matrix.os == 'windows-latest'
