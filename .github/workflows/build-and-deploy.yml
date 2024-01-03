@@ -32,6 +32,8 @@ jobs:
           arch: x64
           toolset: 14.36.32532
 
+      - uses: seanmiddleditch/gha-setup-ninja@master
+
       - name: Cache gflags build
         if: matrix.os == 'windows-latest'
         id: cache-gflags
@@ -110,6 +112,8 @@ jobs:
     runs-on: ubuntu-latest
     # upload to PyPI on every tag
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+    permissions:
+      id-token: write  # this permission is mandatory for trusted publishing
     steps:
       - uses: actions/download-artifact@v4
 
