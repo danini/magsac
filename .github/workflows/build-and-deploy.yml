@@ -32,10 +32,6 @@ jobs:
           arch: x64
           toolset: 14.36.32532
 
-      - name: Install Ninja
-        if: matrix.os == 'windows-latest'
-        run: choco install ninja
-
       - name: Cache OpenCV build
         if: matrix.os == 'windows-latest'
         id: cache-opencv
@@ -72,7 +68,9 @@ jobs:
 
       - name: Build gflags on Windows
         if: matrix.os == 'windows-latest' && steps.cache-gflags.outputs.cache-hit != 'true'
-        run: scripts/build-gflags.ps1
+        run: |
+          choco install ninja
+          scripts/build-gflags.ps1
         shell: pwsh
 
       - name: Build wheels
