@@ -74,7 +74,7 @@ jobs:
         shell: pwsh
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.16.2
+        uses: pypa/cibuildwheel@v2.22.0
         env:
           CIBW_ENVIRONMENT_WINDOWS: 'OpenCV_DIR="D:/a/magsac/magsac/opencv/build" Eigen3_DIR="C:/eigen3" gflags_DIR=D:/a/magsac/magsac/gflags/build_'
           CIBW_REPAIR_WHEEL_COMMAND_WINDOWS: "delvewheel repair -w {dest_dir} {wheel} --add-path D:/a/magsac/magsac/opencv/build/bin"
@@ -114,6 +114,7 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
     permissions:
       id-token: write  # this permission is mandatory for trusted publishing
+      contents: write  # required for creating releases      
     steps:
       - uses: actions/download-artifact@v4
 
@@ -127,7 +128,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
 
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
