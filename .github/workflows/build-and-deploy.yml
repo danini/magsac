@@ -27,7 +27,7 @@ jobs:
 
       - name: Setup MSVC Developer Command Prompt
         if: matrix.os == 'windows-latest'
-        uses: TheMrMilchmann/setup-msvc-dev@v2.0.1
+        uses: TheMrMilchmann/setup-msvc-dev@v3.0.1
         with:
           arch: x64
           toolset: "14"
