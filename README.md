@@ -45,7 +45,7 @@ If you use the algorithm, please cite
 There are pre-compiled wheels for Windows and Linux for Python 3.8 - 3.11 that you can install with:
 
 ```
-pip install magsac
+pip install pymagsac
 ```
 
 Thanks to [@akaszynski](https://github.com/akaszynski) for his contributions.
