@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "scikit_build_core.build"
-requires = ["scikit-build-core >=0.4.3", "nanobind >=1.3.2"]
+requires = ["scikit-build-core >=0.4.3"]
 
 [project]
 name = "pymagsac"
@@ -28,7 +28,7 @@ testpaths = 'tests'
 
 [tool.cibuildwheel]
 archs = ["auto64"]  # 64-bit only
-build = "cp310-* cp311-* cp312-* cp313-* cp314-*"  # Only build Python 3.10-3.14 wheels
+build = "cp310-* cp311-* cp312-*"  # Only build Python 3.10 - 3.12 since 3.12 is ABI3 compatible
 skip = ["pp*", "*musllinux*"]  # disable PyPy and musl-based wheels
 manylinux-x86_64-image = "ghcr.io/akaszynski/manylinux2014-centos7-opencv/manylinux2014_x86_64_opencv3:v3.4.5.4"
 test-requires = "pytest"

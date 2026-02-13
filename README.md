@@ -55,10 +55,8 @@ Thanks to [@akaszynski](https://github.com/akaszynski) for his contributions.
 To build and install C++-only `MAGSAC`/`MAGSAC++`, clone or download this repository and then build the project by CMAKE. 
 ```shell
 $ git clone https://github.com/danini/magsac --recursive
-$ mkdir build
-$ cd build
-$ cmake ..
-$ make
+$ cmake -S . -B build
+$ cmake --build build
 ```
 
 # Install Python package and compile C++

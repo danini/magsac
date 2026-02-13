@@ -26,9 +26,8 @@ Compiling
 
 ```shell
 $ git clone https://github.com/danini/magsac
-$ mkdir build
-$ cd build
-$ cmake-gui ..
+$ cmake -S . -B build
+$ cmake --build build
 ```
 
 - CMake: Configure + Generate

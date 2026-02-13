@@ -1,3 +1,6 @@
 [submodule "graph-cut-ransac"]
 	path = graph-cut-ransac
 	url = https://github.com/danini/graph-cut-ransac
+[submodule "lib/nanobind"]
+	path = lib/nanobind
+	url = https://github.com/wjakob/nanobind.git

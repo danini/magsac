@@ -359,6 +359,7 @@ CMakeFiles/
 Makefile
 cmake_install.cmake
 compile_commands.json
+lib/pymagsac.abi3.so
 
 # clang
 .clangd

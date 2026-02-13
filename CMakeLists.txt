@@ -68,16 +68,18 @@ endif (USE_OPENMP)
 # ==============================================================================
 # Nanobind
 # ==============================================================================
+add_subdirectory(${PROJECT_SOURCE_DIR}/lib/nanobind)
+
 find_package(Python 3.8
   REQUIRED COMPONENTS Interpreter Development.Module
   OPTIONAL_COMPONENTS Development.SABIModule)
 
-find_package(nanobind CONFIG REQUIRED)
+# find_package(nanobind CONFIG REQUIRED)  # if using pyproject 
 
 # ==============================================================================
 # Includes
 # ==============================================================================
-SET(SOURCE_DIR ${PROJECT_SOURCE_DIR}/src/pymagsac)
+SET(SOURCE_DIR "src/pymagsac")
 
 include_directories (
 	${PROJECT_SOURCE_DIR}/graph-cut-ransac/src/pygcransac/include
