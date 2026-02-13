@@ -42,7 +42,7 @@ If you use the algorithm, please cite
 ```
 
 # Install from PyPI with pip
-There are pre-compiled wheels for Windows and Linux for Python 3.8 - 3.11 that you can install with:
+There are pre-compiled wheels for Windows and Linux for Python 3.10 - 3.14 that you can install with:
 
 ```
 pip install pymagsac
@@ -55,6 +55,7 @@ Thanks to [@akaszynski](https://github.com/akaszynski) for his contributions.
 To build and install C++-only `MAGSAC`/`MAGSAC++`, clone or download this repository and then build the project by CMAKE. 
 ```shell
 $ git clone https://github.com/danini/magsac --recursive
+$ mkdir build
 $ cd build
 $ cmake ..
 $ make
@@ -62,14 +63,14 @@ $ make
 
 # Install Python package and compile C++
 
-```bash
-python3 ./setup.py install
+```
+pip install .
 ```
 
 or
 
 ```bash
-pip3 install -e .
+pip install -e .
 ```
 
 # Example project

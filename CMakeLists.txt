@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.15)
 
 project(MAGSAC LANGUAGES CXX)
 
@@ -23,8 +23,7 @@ ENDIF(CMAKE_COMPILER_IS_GNUCXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_FLAGS "-fpermissive")
-set(CMAKE_CXX_FLAGS "-fPIC")
+set(CMAKE_CXX_FLAGS "-fpermissive -fPIC")
 # ==============================================================================
 # Find OpenCV
 # ==============================================================================
@@ -67,9 +66,18 @@ if (USE_OPENMP)
 endif (USE_OPENMP)
 
 # ==============================================================================
+# Nanobind
+# ==============================================================================
+find_package(Python 3.8
+  REQUIRED COMPONENTS Interpreter Development.Module
+  OPTIONAL_COMPONENTS Development.SABIModule)
+
+find_package(nanobind CONFIG REQUIRED)
+
+# ==============================================================================
 # Includes
 # ==============================================================================
-SET(SOURCE_DIR "src/pymagsac")
+SET(SOURCE_DIR ${PROJECT_SOURCE_DIR}/src/pymagsac)
 
 include_directories (
 	${PROJECT_SOURCE_DIR}/graph-cut-ransac/src/pygcransac/include
@@ -119,13 +127,16 @@ file(GLOB_RECURSE SRCS_MAGSAC
 # Structure: Python binding
 # ==============================================================================
 # Generate python module
-add_subdirectory(lib/pybind11)
 
-pybind11_add_module(pymagsac 
-	${SOURCE_DIR}/src/bindings.cpp 
-	${SOURCE_DIR}/src/magsac_python.cpp
-	${HDRS_MAGSAC} 
-	${SRCS_MAGSAC})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
+
+nanobind_add_module(pymagsac
+  STABLE_ABI
+  ${SOURCE_DIR}/src/bindings.cpp 
+  ${SOURCE_DIR}/src/magsac_python.cpp
+  ${HDRS_MAGSAC} 
+  ${SRCS_MAGSAC}
+)
 
 target_link_libraries(pymagsac PRIVATE  
 	${OpenCV_LIBS} 
@@ -144,9 +155,8 @@ target_link_libraries(${PROJECT_NAME}
 	gflags
 )
 
-install(TARGETS pymagsac DESTINATION .)
+install(TARGETS pymagsac LIBRARY DESTINATION pymagsac)
 
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 	
 # ==============================================================================
 # Structure: Applications

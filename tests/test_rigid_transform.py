@@ -1,4 +1,5 @@
 """Test ``pymagsac.findRigidTransformation``."""
+
 import os
 import pymagsac
 import numpy as np
@@ -57,7 +58,6 @@ def verify_magsac(
 
     pose, mask = pymagsac.findRigidTransformation(
         np.ascontiguousarray(corrs),
-        probabilities=[],
         min_iters=min_iters,
         max_iters=max_iters,
         sampler=sampler_id,

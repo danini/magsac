@@ -352,3 +352,16 @@ build
 *.egg-info*
 wheelhouse
 dist
+
+# cmake
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+compile_commands.json
+
+# clang
+.clangd
+
+# NixOs
+shell.nix
