@@ -1,6 +1,5 @@
 import numpy as np
 from numpy.typing import NDArray
-from typing import Optional
 
 def adaptiveInlierSelection(
     x1y1: NDArray[np.float64],

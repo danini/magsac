@@ -54,8 +54,6 @@ def verify_magsac(
     min_iters=1000,
     max_iters=5000,
 ):
-    n = len(corrs)
-
     pose, mask = pymagsac.findRigidTransformation(
         np.ascontiguousarray(corrs),
         min_iters=min_iters,
@@ -70,13 +68,10 @@ def verify_magsac(
 
 def tranform_points(corrs, T):
     n = len(corrs)
-    points1 = np.float32([corrs[i][0:3] for i in np.arange(n)]).reshape(-1, 3)
-    points2 = np.float32([corrs[i][3:6] for i in np.arange(n)]).reshape(-1, 3)
-
     transformed_corrs = np.zeros((corrs.shape[0], 6))
 
     for i in range(n):
-        p1 = np.append(correspondences[i][:3], 1)
+        p1 = np.append(CORRESPONDENCES[i][:3], 1)
         p2 = p1.dot(T)
         transformed_corrs[i][:3] = p2[:3]
         transformed_corrs[i][3:] = corrs[i][3:]
