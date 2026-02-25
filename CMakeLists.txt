@@ -71,10 +71,6 @@ endif (USE_OPENMP)
 # ==============================================================================
 SET(SOURCE_DIR "src/pymagsac")
 
-include_directories (
-	${PROJECT_SOURCE_DIR}/graph-cut-ransac/src/pygcransac/include
-)
-
 # ==============================================================================
 # Structure: Graph-Cut RANSAC Library
 # ==============================================================================
@@ -93,6 +89,8 @@ add_library(GraphCutRANSAC STATIC
 	${SRCS_GraphCutRANSAC}
 )
 
+target_include_directories(GraphCutRANSAC PUBLIC ${PROJECT_SOURCE_DIR}/graph-cut-ransac/src/pygcransac/include)
+
 target_link_libraries(GraphCutRANSAC
 	${OpenCV_LIBS}
 	Eigen3::Eigen
@@ -101,9 +99,6 @@ target_link_libraries(GraphCutRANSAC
 # ==============================================================================
 # Structure: MAGSAC Library
 # ==============================================================================
-
-# Tell cmake that headers are in alse in source_dir
-include_directories (${SOURCE_DIR}/include)
 
 # Set header files for the library
 file(GLOB_RECURSE HDRS_MAGSAC
@@ -127,6 +122,8 @@ pybind11_add_module(pymagsac
 	${HDRS_MAGSAC} 
 	${SRCS_MAGSAC})
 
+target_include_directories(pymagsac PUBLIC ${SOURCE_DIR}/include)
+
 target_link_libraries(pymagsac PRIVATE  
 	${OpenCV_LIBS} 
 	Eigen3::Eigen
@@ -136,6 +133,9 @@ target_link_libraries(pymagsac PRIVATE
 add_library(${PROJECT_NAME} STATIC 
 	${HDRS_MAGSAC} 
 	${SRCS_MAGSAC})
+
+# Tell cmake that headers are in alse in source_dir
+target_include_directories(${PROJECT_NAME} PUBLIC ${SOURCE_DIR}/include)
 
 target_link_libraries(${PROJECT_NAME} 
 	${OpenCV_LIBS}
