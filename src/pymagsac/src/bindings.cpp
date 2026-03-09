@@ -65,7 +65,6 @@ nb::tuple adaptiveInlierSelection(
 
     NDArray<bool, 1> inliers_ = MakeNDArray<bool, 1>({NUM_TENTS});
 
-    // nb::buffer_info bufInliers = inliers_.data();
     bool* ptrInliers = inliers_.data();
     for (size_t i = 0; i < NUM_TENTS; i++)
         ptrInliers[i] = inliers[i];
