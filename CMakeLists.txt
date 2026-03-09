@@ -70,7 +70,7 @@ endif (USE_OPENMP)
 # ==============================================================================
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/nanobind)
 
-find_package(Python 3.10
+find_package(Python
   REQUIRED COMPONENTS Interpreter Development.Module
   OPTIONAL_COMPONENTS Development.SABIModule)
 
