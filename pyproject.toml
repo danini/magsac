@@ -35,7 +35,7 @@ build = "cp310-* cp311-* cp312-* cp313-* cp314-*"
 skip = ["pp*", "*musllinux*"]  # disable PyPy and musl-based wheels
 manylinux-x86_64-image = "ghcr.io/akaszynski/manylinux2014-centos7-opencv/manylinux2014_x86_64_opencv3:v3.4.5.4"
 test-extras = ["tests"]
-test-command = "pytest {project}/tests"
+test-command = "pytest {project}/tests -vv"
 
 [tool.cibuildwheel.windows]
 # Use delvewheel on windows
