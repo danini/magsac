@@ -52,7 +52,7 @@ NDArray<T, N> WrapNDarray(T *data, const std::array<int, N> shape,
 }
 
 template <typename T, size_t N>
-NDArray<T, N> MakeNDArray(const std::array<int, N> shape,
+NDArray<T, N> MakeNDArray(const std::array<size_t, N> shape,
                           bool zero_initialize = false) {
 
   // Calculate the total number of elements in the ndarray
