@@ -1,15 +1,18 @@
 """Test ``pymagsac.findLine2D`` on real edge points."""
 
+from pathlib import Path
 import numpy as np
 import cv2
 import pytest
 import pymagsac
 
+THIS_PATH = Path(__file__).resolve().parent
+
 
 @pytest.mark.parametrize("use_magsac_plus_plus", [True, False])
-def test_find_line2d_edges(use_magsac_plus_plus):
+def test_find_line2d_edges(use_magsac_plus_plus: bool) -> None:
     # Load test image
-    img = cv2.imread("../graph-cut-ransac/build/data/adam/adam1.png")
+    img = cv2.imread(THIS_PATH / "test_data" / "adam1.png")
     assert img is not None, "Test image not found"
 
     img_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -17,12 +20,12 @@ def test_find_line2d_edges(use_magsac_plus_plus):
     edges = cv2.Canny(img_blur, 50, 150)
 
     # Extract edge points
-    edge_points = np.argwhere(edges == 255)[:, ::-1]  # Swap x,y
+    edge_points = np.argwhere(edges == 255)[:, ::-1].astype(np.float64)  # Swap x,y
     assert len(edge_points) > 0, "No edges detected"
 
     # Run MAGSAC line fitting
     line, mask = pymagsac.findLine2D(
-        np.ascontiguousarray(edge_points),
+        edge_points,
         w1=img.shape[1],
         h1=img.shape[0],
         sampler=0,

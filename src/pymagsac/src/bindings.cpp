@@ -214,7 +214,7 @@ nb::tuple findEssentialMatrix(
     double h1,
     double w2,
     double h2,
-	NDArray<double, 2>  probabilities_,
+	NDArray<double, 1>  probabilities_,
 	int sampler,
     bool use_magsac_plus_plus,
     double sigma_th,

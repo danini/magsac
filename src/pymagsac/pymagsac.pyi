@@ -28,7 +28,7 @@ def findEssentialMatrix(
     min_iters: int = 50,
     max_iters: int = 1000,
     partition_num: int = 5,
-) -> tuple[NDArray[np.float64] | None, NDArray[bool]]: ...
+) -> tuple[NDArray[np.float64] | None, NDArray[np.bool]]: ...
 
 # returns: (3x3 Essential matrix or None, inliers mask)
 
@@ -46,7 +46,7 @@ def findFundamentalMatrix(
     min_iters: int = 50,
     max_iters: int = 1000,
     partition_num: int = 5,
-) -> tuple[NDArray[np.float64] | None, NDArray[bool]]: ...
+) -> tuple[NDArray[np.float64] | None, NDArray[np.bool]]: ...
 
 # returns: (3x3 Fundamental matrix or None, inliers mask)
 
@@ -60,7 +60,7 @@ def findRigidTransformation(
     min_iters: int = 50,
     max_iters: int = 1000,
     partition_num: int = 5,
-) -> tuple[NDArray[np.float64] | None, NDArray[bool]]: ...
+) -> tuple[NDArray[np.float64] | None, NDArray[np.bool]]: ...
 
 # returns: (4x4 transformation matrix or None, inliers mask)
 
@@ -78,7 +78,7 @@ def findHomography(
     min_iters: int = 50,
     max_iters: int = 1000,
     partition_num: int = 5,
-) -> tuple[NDArray[np.float64] | None, NDArray[bool]]: ...
+) -> tuple[NDArray[np.float64] | None, NDArray[np.bool]]: ...
 
 # returns: (3x3 Homography or None, inliers mask)
 
@@ -94,6 +94,6 @@ def findLine2D(
     min_iters: int = 50,
     max_iters: int = 1000,
     partition_num: int = 5,
-) -> tuple[NDArray[np.float64] | None, NDArray[bool]]: ...
+) -> tuple[NDArray[np.float64] | None, NDArray[np.bool]]: ...
 
 # returns: (line parameters [a,b,c] or None, inliers mask)

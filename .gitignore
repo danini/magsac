@@ -366,3 +366,11 @@ lib/pymagsac.abi3.so
 
 # NixOs
 shell.nix
+
+# gtags
+GPATH
+GRTAGS
+GTAGS
+
+# jupyter
+.ipynb_checkpoints/
