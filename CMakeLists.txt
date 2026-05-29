@@ -57,13 +57,29 @@ set(EIGEN_INCLUDE_DIRS ${EIGEN3_INCLUDE_DIR})
 # ==============================================================================
 # Find OpenMP
 # ==============================================================================
+if(APPLE AND USE_OPENMP)
+	# Help CMake find Homebrew's libomp on macOS
+	execute_process(COMMAND brew --prefix libomp
+		OUTPUT_VARIABLE LIBOMP_PREFIX
+		OUTPUT_STRIP_TRAILING_WHITESPACE
+		ERROR_QUIET)
+	if(LIBOMP_PREFIX)
+		set(OpenMP_CXX_FLAGS "-Xclang -fopenmp" CACHE STRING "" FORCE)
+		set(OpenMP_CXX_LIB_NAMES "omp" CACHE STRING "" FORCE)
+		set(OpenMP_omp_LIBRARY "${LIBOMP_PREFIX}/lib/libomp.dylib" CACHE STRING "" FORCE)
+		include_directories("${LIBOMP_PREFIX}/include")
+	endif()
+endif()
+
 find_package(OpenMP)
 if (USE_OPENMP)
 	if(NOT OPENMP_FOUND)
-		message(FATAL_ERROR "OPENMP not found.")
+		message(WARNING "OpenMP not found. Building without OpenMP support.")
+		set(USE_OPENMP OFF)
+	else()
+		add_definitions(-DUSE_OPENMP)
+		set(TRGT_LNK_LBS_ADDITIONAL OpenMP::OpenMP_CXX)
 	endif()
-	add_definitions(-DUSE_OPENMP)
-	set(TRGT_LNK_LBS_ADDITIONAL OpenMP::OpenMP_CXX)
 endif (USE_OPENMP)
 
 # ==============================================================================
