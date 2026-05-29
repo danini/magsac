@@ -19,12 +19,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
+
+      - name: Install OpenMP on macOS
+        if: matrix.os == 'macos-latest'
+        run: brew install libomp
 
       - name: Setup MSVC Developer Command Prompt
         if: matrix.os == 'windows-latest'
