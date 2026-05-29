@@ -3,4 +3,4 @@
 	url = https://github.com/pybind/pybind11.git
 [submodule "graph-cut-ransac"]
 	path = graph-cut-ransac
-	url = https://github.com/danini/graph-cut-ransac
+	url = https://github.com/f-dy/graph-cut-ransac
