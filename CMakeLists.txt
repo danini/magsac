@@ -75,6 +75,16 @@ include_directories (
 	${PROJECT_SOURCE_DIR}/graph-cut-ransac/src/pygcransac/include
 )
 
+# Check if the graph-cut-ransac submodule provides gamma_values_dof1.cpp (DoF=1 table).
+# If not, use the local copy in src/pymagsac/include/.
+set(GCRANSAC_DOF1_TABLE "${PROJECT_SOURCE_DIR}/graph-cut-ransac/src/pygcransac/include/gamma_values_dof1.cpp")
+if(EXISTS "${GCRANSAC_DOF1_TABLE}")
+	message(STATUS "Using gamma_values_dof1.cpp from graph-cut-ransac submodule")
+else()
+	message(STATUS "gamma_values_dof1.cpp not found in graph-cut-ransac; using local copy")
+	include_directories(BEFORE ${PROJECT_SOURCE_DIR}/src/pymagsac/include)
+endif()
+
 # ==============================================================================
 # Structure: Graph-Cut RANSAC Library
 # ==============================================================================
@@ -84,9 +94,11 @@ file(GLOB_RECURSE HDRS_GraphCutRANSAC
 ) 
 
 # Set source files to be added to the library
+# Note: gamma_values*.cpp are data tables #included by headers, not compiled directly
 file(GLOB_RECURSE SRCS_GraphCutRANSAC 
 	"graph-cut-ransac/src/pygcransac/include/*.cpp"
 )
+list(FILTER SRCS_GraphCutRANSAC EXCLUDE REGEX "gamma_values")
 
 add_library(GraphCutRANSAC STATIC
 	${HDRS_GraphCutRANSAC}
@@ -114,6 +126,7 @@ file(GLOB_RECURSE HDRS_MAGSAC
 file(GLOB_RECURSE SRCS_MAGSAC 
 	"${SOURCE_DIR}/include/*.cpp"
 )
+list(FILTER SRCS_MAGSAC EXCLUDE REGEX "gamma_values")
 
 # ==============================================================================
 # Structure: Python binding

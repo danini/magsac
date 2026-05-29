@@ -37,13 +37,10 @@ int findRigidTransformation_(
     magsac::utils::DefaultRigidTransformationEstimator estimator; // The robust rigid transformation estimator class containing the
     gcransac::RigidTransformation model; // The estimated model
 
-    MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>* magsac;
-    if (use_magsac_plus_plus)
-        magsac = new MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>(
-            MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>::MAGSAC_PLUS_PLUS);
-    else
-        magsac = new MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>(
-            MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>::MAGSAC_ORIGINAL);
+    MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator> magsac_obj(use_magsac_plus_plus ?
+        MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>::MAGSAC_PLUS_PLUS :
+        MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>::MAGSAC_ORIGINAL);
+    auto* magsac = &magsac_obj;
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
@@ -172,13 +169,10 @@ int findFundamentalMatrix_(
     magsac::utils::DefaultFundamentalMatrixEstimator estimator(0.1); // The robust homography estimator class containing the
     gcransac::FundamentalMatrix model; // The estimated model
 
-    MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>* magsac;
-    if (use_magsac_plus_plus)
-        magsac = new MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>(
-            MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>::MAGSAC_PLUS_PLUS);
-    else
-        magsac = new MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>(
-            MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>::MAGSAC_ORIGINAL);
+    MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator> magsac_obj(use_magsac_plus_plus ?
+        MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>::MAGSAC_PLUS_PLUS :
+        MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>::MAGSAC_ORIGINAL);
+    auto* magsac = &magsac_obj;
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
@@ -490,13 +484,10 @@ int findLine2D_(std::vector<double>& pointsArr,
     magsac::utils::Default2DLineEstimator estimator; // The robust homography estimator class containing the function for the fitting and residual calculation
     gcransac::Homography model; // The estimated model
 
-    MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>* magsac;
-    if (use_magsac_plus_plus)
-        magsac = new MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>(
-            MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>::MAGSAC_PLUS_PLUS);
-    else
-        magsac = new MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>(
-            MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>::MAGSAC_ORIGINAL);
+    MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator> magsac_obj(use_magsac_plus_plus ?
+        MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>::MAGSAC_PLUS_PLUS :
+        MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>::MAGSAC_ORIGINAL);
+    auto* magsac = &magsac_obj;
 
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
@@ -590,6 +581,682 @@ int findLine2D_(std::vector<double>& pointsArr,
     return num_inliers;
 }
 
+int findPlane3D_(std::vector<double>& pointsArr,
+    std::vector<bool>& inliers,
+    std::vector<double>& plane,
+    std::vector<double>& inlier_probabilities,
+    int sampler_id,
+    bool use_magsac_plus_plus,
+    double sigma_max,
+    double conf,
+    int min_iters,
+    int max_iters,
+    int partition_num)
+{
+    magsac::utils::Default3DPlaneEstimator estimator;
+    gcransac::Model model;
+
+    MAGSAC<cv::Mat, magsac::utils::Default3DPlaneEstimator> magsac_obj(use_magsac_plus_plus ?
+        MAGSAC<cv::Mat, magsac::utils::Default3DPlaneEstimator>::MAGSAC_PLUS_PLUS :
+        MAGSAC<cv::Mat, magsac::utils::Default3DPlaneEstimator>::MAGSAC_ORIGINAL);
+    auto* magsac = &magsac_obj;
+
+    magsac->setMaximumThreshold(sigma_max);
+    // Reference threshold for the adaptive iteration count. The default (1.0) is
+    // a pixel-unit assumption from the 2D estimators; for metric data it makes the
+    // iteration count unit-dependent. Derive it from sigma_max (k*sigma_max = the
+    // statistical inlier threshold) so it scales with the data.
+    magsac->setReferenceThreshold(estimator.getSigmaQuantile() * sigma_max);
+    magsac->setCoreNumber(1);
+    magsac->setPartitionNumber(partition_num);
+    magsac->setIterationLimit(max_iters);
+    magsac->setMinimumIterationNumber(min_iters);
+
+    ModelScore score;
+
+    int num_tents = pointsArr.size() / 3;
+    cv::Mat points(num_tents, 3, CV_64F, &pointsArr[0]);
+
+    typedef gcransac::sampler::Sampler<cv::Mat, size_t> AbstractSampler;
+    std::unique_ptr<AbstractSampler> main_sampler;
+    if (sampler_id == 0)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::UniformSampler(&points));
+    else if (sampler_id == 1)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProsacSampler(&points, estimator.sampleSize()));
+    else if (sampler_id == 3)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ImportanceSampler(&points,
+            inlier_probabilities,
+            estimator.sampleSize()));
+    else if (sampler_id == 4)
+    {
+        double variance = 0.1;
+        double max_prob = 0;
+        for (const auto &prob : inlier_probabilities)
+            max_prob = MAX(max_prob, prob);
+        for (auto &prob : inlier_probabilities)
+            prob /= max_prob;
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::AdaptiveReorderingSampler(&points,
+            inlier_probabilities,
+            estimator.sampleSize(),
+            variance));
+    }
+    else
+    {
+        fprintf(stderr, "Unknown sampler identifier: %d. The accepted samplers are 0 (uniform), 1 (PROSAC), 3 (NG-RANSAC), 4 (AR-Sampler)\n",
+            sampler_id);
+        return 0;
+    }
+
+    bool success = magsac->run(points,
+        conf,
+        estimator,
+        *main_sampler.get(),
+        model,
+        max_iters,
+        score);
+
+    inliers.resize(num_tents);
+    if (!success)
+    {
+        for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx)
+            inliers[pt_idx] = false;
+        plane.resize(4, 0);
+        return 0;
+    }
+
+    int num_inliers = 0;
+    for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx)
+    {
+        const int is_inlier = estimator.residual(points.row(pt_idx), model.descriptor) <= sigma_max;
+        inliers[pt_idx] = (bool)is_inlier;
+        num_inliers += is_inlier;
+    }
+
+    plane.resize(4);
+    for (int i = 0; i < 4; i++)
+        plane[i] = (double)model.descriptor(i);
+
+    AbstractSampler *sampler_ptr = main_sampler.release();
+    delete sampler_ptr;
+
+    return num_inliers;
+}
+
+int findPnP_(std::vector<double>& correspondencesArr,
+    std::vector<bool>& inliers,
+    std::vector<double>& pose,
+    std::vector<double>& inlier_probabilities,
+    int sampler_id,
+    bool use_magsac_plus_plus,
+    double sigma_max,
+    double conf,
+    int min_iters,
+    int max_iters,
+    int partition_num)
+{
+    magsac::utils::DefaultPnPEstimator estimator;
+    gcransac::Model model;
+
+    MAGSAC<cv::Mat, magsac::utils::DefaultPnPEstimator> magsac_obj(use_magsac_plus_plus ?
+        MAGSAC<cv::Mat, magsac::utils::DefaultPnPEstimator>::MAGSAC_PLUS_PLUS :
+        MAGSAC<cv::Mat, magsac::utils::DefaultPnPEstimator>::MAGSAC_ORIGINAL);
+    auto* magsac = &magsac_obj;
+
+    magsac->setMaximumThreshold(sigma_max);
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale (k*sigma_max = the statistical inlier threshold) so it is
+    // unit-independent. New estimator — no prior behavior to preserve.
+    magsac->setReferenceThreshold(magsac::utils::DefaultPnPEstimator::getSigmaQuantile() * sigma_max);
+    magsac->setCoreNumber(1);
+    magsac->setPartitionNumber(partition_num);
+    magsac->setIterationLimit(max_iters);
+    magsac->setMinimumIterationNumber(min_iters);
+
+    ModelScore score;
+
+    // Data format: [u, v, x, y, z] per row (2D image point + 3D world point)
+    int num_tents = correspondencesArr.size() / 5;
+    cv::Mat points(num_tents, 5, CV_64F, &correspondencesArr[0]);
+
+    typedef gcransac::sampler::Sampler<cv::Mat, size_t> AbstractSampler;
+    std::unique_ptr<AbstractSampler> main_sampler;
+    if (sampler_id == 0)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::UniformSampler(&points));
+    else if (sampler_id == 1)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProsacSampler(&points, estimator.sampleSize()));
+    else if (sampler_id == 3)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ImportanceSampler(&points,
+            inlier_probabilities, estimator.sampleSize()));
+    else if (sampler_id == 4)
+    {
+        double variance = 0.1;
+        double max_prob = 0;
+        for (const auto &prob : inlier_probabilities)
+            max_prob = MAX(max_prob, prob);
+        for (auto &prob : inlier_probabilities)
+            prob /= max_prob;
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::AdaptiveReorderingSampler(&points,
+            inlier_probabilities, estimator.sampleSize(), variance));
+    }
+    else
+    {
+        fprintf(stderr, "Unknown sampler identifier: %d.\n", sampler_id);
+        return 0;
+    }
+
+    bool success = magsac->run(points, conf, estimator, *main_sampler.get(), model, max_iters, score);
+
+    inliers.resize(num_tents);
+    if (!success)
+    {
+        for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx)
+            inliers[pt_idx] = false;
+        pose.resize(12, 0);
+        return 0;
+    }
+
+    int num_inliers = 0;
+    for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx)
+    {
+        const int is_inlier = estimator.residual(points.row(pt_idx), model.descriptor) <= sigma_max;
+        inliers[pt_idx] = (bool)is_inlier;
+        num_inliers += is_inlier;
+    }
+
+    // Model is 3x4 [R|t]
+    pose.resize(12);
+    for (int i = 0; i < 12; i++)
+        pose[i] = (double)model.descriptor(i / 4, i % 4);
+
+    AbstractSampler *sampler_ptr = main_sampler.release();
+    delete sampler_ptr;
+
+    return num_inliers;
+}
+
+int findPnPAC_(std::vector<double>& correspondencesArr,
+    std::vector<bool>& inliers,
+    std::vector<double>& pose,
+    std::vector<double>& inlier_probabilities,
+    int sampler_id, bool use_magsac_plus_plus,
+    double sigma_max, double conf, int min_iters, int max_iters, int partition_num)
+{
+    magsac::utils::DefaultACP1PEstimator estimator;
+    gcransac::Model model;
+
+    MAGSAC<cv::Mat, magsac::utils::DefaultACP1PEstimator> magsac_obj(use_magsac_plus_plus ?
+        MAGSAC<cv::Mat, magsac::utils::DefaultACP1PEstimator>::MAGSAC_PLUS_PLUS :
+        MAGSAC<cv::Mat, magsac::utils::DefaultACP1PEstimator>::MAGSAC_ORIGINAL);
+    auto* magsac = &magsac_obj;
+
+    magsac->setMaximumThreshold(sigma_max);
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale (k*sigma_max = the statistical inlier threshold) so it is
+    // unit-independent. New estimator — no prior behavior to preserve.
+    magsac->setReferenceThreshold(magsac::utils::DefaultACP1PEstimator::getSigmaQuantile() * sigma_max);
+    magsac->setCoreNumber(1);
+    magsac->setPartitionNumber(partition_num);
+    magsac->setIterationLimit(max_iters);
+    magsac->setMinimumIterationNumber(min_iters);
+
+    ModelScore score;
+    int num_tents = correspondencesArr.size() / 12;
+    cv::Mat points(num_tents, 12, CV_64F, &correspondencesArr[0]);
+
+    typedef gcransac::sampler::Sampler<cv::Mat, size_t> AbstractSampler;
+    std::unique_ptr<AbstractSampler> main_sampler;
+    if (sampler_id == 0)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::UniformSampler(&points));
+    else if (sampler_id == 1)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProsacSampler(&points, estimator.sampleSize()));
+    else { fprintf(stderr, "Unknown sampler: %d\n", sampler_id); return 0; }
+
+    bool success = magsac->run(points, conf, estimator, *main_sampler.get(), model, max_iters, score);
+
+    inliers.resize(num_tents);
+    if (!success) { for (int i = 0; i < num_tents; i++) inliers[i] = false; pose.resize(12, 0); return 0; }
+
+    int num_inliers = 0;
+    for (int pt_idx = 0; pt_idx < num_tents; ++pt_idx) {
+        const int is_inlier = estimator.residual(points.row(pt_idx), model.descriptor) <= sigma_max;
+        inliers[pt_idx] = (bool)is_inlier;
+        num_inliers += is_inlier;
+    }
+
+    pose.resize(12);
+    for (int i = 0; i < 12; i++) pose[i] = (double)model.descriptor(i / 4, i % 4);
+
+    AbstractSampler *sampler_ptr = main_sampler.release();
+    delete sampler_ptr;
+    return num_inliers;
+}
+
+int findPnPSIFT_(std::vector<double>& correspondencesArr,
+    std::vector<bool>& inliers,
+    std::vector<double>& pose,
+    std::vector<double>& inlier_probabilities,
+    int sampler_id, bool use_magsac_plus_plus,
+    double sigma_max, double conf, int min_iters, int max_iters, int partition_num)
+{
+    magsac::utils::DefaultSIFTP1PEstimator estimator;
+    gcransac::Model model;
+
+    MAGSAC<cv::Mat, magsac::utils::DefaultSIFTP1PEstimator> magsac_obj(use_magsac_plus_plus ?
+        MAGSAC<cv::Mat, magsac::utils::DefaultSIFTP1PEstimator>::MAGSAC_PLUS_PLUS :
+        MAGSAC<cv::Mat, magsac::utils::DefaultSIFTP1PEstimator>::MAGSAC_ORIGINAL);
+    auto* magsac = &magsac_obj;
+
+    magsac->setMaximumThreshold(sigma_max);
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale (k*sigma_max = the statistical inlier threshold) so it is
+    // unit-independent. New estimator — no prior behavior to preserve.
+    magsac->setReferenceThreshold(magsac::utils::DefaultSIFTP1PEstimator::getSigmaQuantile() * sigma_max);
+    magsac->setCoreNumber(1);
+    magsac->setPartitionNumber(partition_num);
+    magsac->setIterationLimit(max_iters);
+    magsac->setMinimumIterationNumber(min_iters);
+
+    ModelScore score;
+    int num_tents = correspondencesArr.size() / 12;
+    cv::Mat points(num_tents, 12, CV_64F, &correspondencesArr[0]);
+
+    typedef gcransac::sampler::Sampler<cv::Mat, size_t> AbstractSampler;
+    std::unique_ptr<AbstractSampler> main_sampler;
+    if (sampler_id == 0)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::UniformSampler(&points));
+    else if (sampler_id == 1)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProsacSampler(&points, estimator.sampleSize()));
+    else { fprintf(stderr, "Unknown sampler: %d\n", sampler_id); return 0; }
+
+    bool success = magsac->run(points, conf, estimator, *main_sampler.get(), model, max_iters, score);
+
+    inliers.resize(num_tents);
+    if (!success) { for (int i = 0; i < num_tents; i++) inliers[i] = false; pose.resize(12, 0); return 0; }
+
+    int num_inliers = 0;
+    for (int pt_idx = 0; pt_idx < num_tents; ++pt_idx) {
+        const int is_inlier = estimator.residual(points.row(pt_idx), model.descriptor) <= sigma_max;
+        inliers[pt_idx] = (bool)is_inlier;
+        num_inliers += is_inlier;
+    }
+
+    pose.resize(12);
+    for (int i = 0; i < 12; i++) pose[i] = (double)model.descriptor(i / 4, i % 4);
+
+    AbstractSampler *sampler_ptr = main_sampler.release();
+    delete sampler_ptr;
+    return num_inliers;
+}
+
+int findRadialHomography_(std::vector<double>& correspondencesArr,
+    std::vector<bool>& inliers,
+    std::vector<double>& H,
+    std::vector<double>& inlier_probabilities,
+    int sampler_id,
+    bool use_magsac_plus_plus,
+    double sigma_max,
+    double conf,
+    int min_iters,
+    int max_iters,
+    int partition_num)
+{
+    magsac::utils::DefaultRadialHomographyEstimator estimator;
+    gcransac::Model model;
+
+    MAGSAC<cv::Mat, magsac::utils::DefaultRadialHomographyEstimator> magsac_obj(use_magsac_plus_plus ?
+        MAGSAC<cv::Mat, magsac::utils::DefaultRadialHomographyEstimator>::MAGSAC_PLUS_PLUS :
+        MAGSAC<cv::Mat, magsac::utils::DefaultRadialHomographyEstimator>::MAGSAC_ORIGINAL);
+    auto* magsac = &magsac_obj;
+
+    magsac->setMaximumThreshold(sigma_max);
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale (k*sigma_max = the statistical inlier threshold) so it is
+    // unit-independent. New estimator — no prior behavior to preserve.
+    magsac->setReferenceThreshold(magsac::utils::DefaultRadialHomographyEstimator::getSigmaQuantile() * sigma_max);
+    magsac->setCoreNumber(1);
+    magsac->setPartitionNumber(partition_num);
+    magsac->setIterationLimit(max_iters);
+    magsac->setMinimumIterationNumber(min_iters);
+
+    ModelScore score;
+
+    // Data format: [x1, y1, x2, y2] per row
+    int num_tents = correspondencesArr.size() / 4;
+    cv::Mat points(num_tents, 4, CV_64F, &correspondencesArr[0]);
+
+    typedef gcransac::sampler::Sampler<cv::Mat, size_t> AbstractSampler;
+    std::unique_ptr<AbstractSampler> main_sampler;
+    if (sampler_id == 0)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::UniformSampler(&points));
+    else if (sampler_id == 1)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProsacSampler(&points, estimator.sampleSize()));
+    else if (sampler_id == 3)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ImportanceSampler(&points,
+            inlier_probabilities, estimator.sampleSize()));
+    else if (sampler_id == 4)
+    {
+        double variance = 0.1;
+        double max_prob = 0;
+        for (const auto &prob : inlier_probabilities)
+            max_prob = MAX(max_prob, prob);
+        for (auto &prob : inlier_probabilities)
+            prob /= max_prob;
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::AdaptiveReorderingSampler(&points,
+            inlier_probabilities, estimator.sampleSize(), variance));
+    }
+    else
+    {
+        fprintf(stderr, "Unknown sampler identifier: %d.\n", sampler_id);
+        return 0;
+    }
+
+    bool success = magsac->run(points, conf, estimator, *main_sampler.get(), model, max_iters, score);
+
+    inliers.resize(num_tents);
+    if (!success)
+    {
+        for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx)
+            inliers[pt_idx] = false;
+        H.resize(9, 0);
+        return 0;
+    }
+
+    int num_inliers = 0;
+    for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx)
+    {
+        const int is_inlier = estimator.residual(points.row(pt_idx), model.descriptor) <= sigma_max;
+        inliers[pt_idx] = (bool)is_inlier;
+        num_inliers += is_inlier;
+    }
+
+    // Radial homography model descriptor size varies; output full descriptor
+    int desc_size = model.descriptor.rows() * model.descriptor.cols();
+    H.resize(desc_size);
+    for (int i = 0; i < desc_size; i++)
+        H[i] = (double)model.descriptor(i);
+
+    AbstractSampler *sampler_ptr = main_sampler.release();
+    delete sampler_ptr;
+
+    return num_inliers;
+}
+
+int findHomographyAffine_(std::vector<double>& correspondencesArr,
+    std::vector<bool>& inliers,
+    std::vector<double>& H,
+    std::vector<double>& inlier_probabilities,
+    int sampler_id,
+    bool use_magsac_plus_plus,
+    double sigma_max,
+    double conf,
+    int min_iters,
+    int max_iters,
+    int partition_num)
+{
+    magsac::utils::DefaultHomographyAffineEstimator estimator;
+    gcransac::Model model;
+
+    MAGSAC<cv::Mat, magsac::utils::DefaultHomographyAffineEstimator> magsac_obj(use_magsac_plus_plus ?
+        MAGSAC<cv::Mat, magsac::utils::DefaultHomographyAffineEstimator>::MAGSAC_PLUS_PLUS :
+        MAGSAC<cv::Mat, magsac::utils::DefaultHomographyAffineEstimator>::MAGSAC_ORIGINAL);
+    auto* magsac = &magsac_obj;
+
+    magsac->setMaximumThreshold(sigma_max);
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale (k*sigma_max = the statistical inlier threshold) so it is
+    // unit-independent. New estimator — no prior behavior to preserve.
+    magsac->setReferenceThreshold(magsac::utils::DefaultHomographyAffineEstimator::getSigmaQuantile() * sigma_max);
+    magsac->setCoreNumber(1);
+    magsac->setPartitionNumber(partition_num);
+    magsac->setIterationLimit(max_iters);
+    magsac->setMinimumIterationNumber(min_iters);
+
+    ModelScore score;
+
+    // Data: [x1, y1, x2, y2, a11, a12, a21, a22] per row
+    int num_tents = correspondencesArr.size() / 8;
+    cv::Mat points(num_tents, 8, CV_64F, &correspondencesArr[0]);
+
+    typedef gcransac::sampler::Sampler<cv::Mat, size_t> AbstractSampler;
+    std::unique_ptr<AbstractSampler> main_sampler;
+    if (sampler_id == 0)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::UniformSampler(&points));
+    else if (sampler_id == 1)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProsacSampler(&points, estimator.sampleSize()));
+    else { fprintf(stderr, "Unknown sampler: %d\n", sampler_id); return 0; }
+
+    bool success = magsac->run(points, conf, estimator, *main_sampler.get(), model, max_iters, score);
+
+    inliers.resize(num_tents);
+    if (!success) { for (int i = 0; i < num_tents; i++) inliers[i] = false; H.resize(9, 0); return 0; }
+
+    int num_inliers = 0;
+    for (int pt_idx = 0; pt_idx < num_tents; ++pt_idx) {
+        const int is_inlier = estimator.residual(points.row(pt_idx), model.descriptor) <= sigma_max;
+        inliers[pt_idx] = (bool)is_inlier;
+        num_inliers += is_inlier;
+    }
+
+    H.resize(9);
+    for (int i = 0; i < 9; i++) H[i] = (double)model.descriptor(i);
+
+    AbstractSampler *sampler_ptr = main_sampler.release();
+    delete sampler_ptr;
+    return num_inliers;
+}
+
+int findFundamentalMatrixAffine_(std::vector<double>& correspondencesArr,
+    std::vector<bool>& inliers,
+    std::vector<double>& F,
+    std::vector<double>& inlier_probabilities,
+    int sampler_id,
+    bool use_magsac_plus_plus,
+    double sigma_max,
+    double conf,
+    int min_iters,
+    int max_iters,
+    int partition_num)
+{
+    magsac::utils::DefaultFundamentalMatrixAffineSIFTEstimator estimator(sigma_max);
+    gcransac::Model model;
+
+    MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixAffineSIFTEstimator> magsac_obj(use_magsac_plus_plus ?
+        MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixAffineSIFTEstimator>::MAGSAC_PLUS_PLUS :
+        MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixAffineSIFTEstimator>::MAGSAC_ORIGINAL);
+    auto* magsac = &magsac_obj;
+
+    magsac->setMaximumThreshold(sigma_max);
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale (k*sigma_max = the statistical inlier threshold) so it is
+    // unit-independent. New estimator — no prior behavior to preserve.
+    magsac->setReferenceThreshold(magsac::utils::DefaultFundamentalMatrixAffineSIFTEstimator::getSigmaQuantile() * sigma_max);
+    magsac->setCoreNumber(1);
+    magsac->setPartitionNumber(partition_num);
+    magsac->setIterationLimit(max_iters);
+    magsac->setMinimumIterationNumber(min_iters);
+
+    ModelScore score;
+
+    // Data: [x1, y1, x2, y2, a11, a12, a21, a22] per row
+    int num_tents = correspondencesArr.size() / 8;
+    cv::Mat points(num_tents, 8, CV_64F, &correspondencesArr[0]);
+
+    typedef gcransac::sampler::Sampler<cv::Mat, size_t> AbstractSampler;
+    std::unique_ptr<AbstractSampler> main_sampler;
+    if (sampler_id == 0)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::UniformSampler(&points));
+    else if (sampler_id == 1)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProsacSampler(&points, estimator.sampleSize()));
+    else { fprintf(stderr, "Unknown sampler: %d\n", sampler_id); return 0; }
+
+    bool success = magsac->run(points, conf, estimator, *main_sampler.get(), model, max_iters, score);
+
+    inliers.resize(num_tents);
+    if (!success) { for (int i = 0; i < num_tents; i++) inliers[i] = false; F.resize(9, 0); return 0; }
+
+    int num_inliers = 0;
+    for (int pt_idx = 0; pt_idx < num_tents; ++pt_idx) {
+        const int is_inlier = estimator.residual(points.row(pt_idx), model.descriptor) <= sigma_max;
+        inliers[pt_idx] = (bool)is_inlier;
+        num_inliers += is_inlier;
+    }
+
+    F.resize(9);
+    for (int i = 0; i < 9; i++) F[i] = (double)model.descriptor(i);
+
+    AbstractSampler *sampler_ptr = main_sampler.release();
+    delete sampler_ptr;
+    return num_inliers;
+}
+
+int findEssentialMatrixPlanar_(std::vector<double>& correspondencesArr,
+    std::vector<bool>& inliers,
+    std::vector<double>& E,
+    std::vector<double>& src_K,
+    std::vector<double>& dst_K,
+    std::vector<double>& inlier_probabilities,
+    int sampler_id,
+    bool use_magsac_plus_plus,
+    double sigma_max,
+    double conf,
+    int min_iters,
+    int max_iters,
+    int partition_num)
+{
+    Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>> intrinsics_src(&src_K[0]);
+    Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>> intrinsics_dst(&dst_K[0]);
+
+    magsac::utils::DefaultPlanarEssentialMatrixEstimator estimator(intrinsics_src, intrinsics_dst);
+    gcransac::Model model;
+
+    MAGSAC<cv::Mat, magsac::utils::DefaultPlanarEssentialMatrixEstimator> magsac_obj(use_magsac_plus_plus ?
+        MAGSAC<cv::Mat, magsac::utils::DefaultPlanarEssentialMatrixEstimator>::MAGSAC_PLUS_PLUS :
+        MAGSAC<cv::Mat, magsac::utils::DefaultPlanarEssentialMatrixEstimator>::MAGSAC_ORIGINAL);
+    auto* magsac = &magsac_obj;
+
+    magsac->setMaximumThreshold(sigma_max);
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale (k*sigma_max = the statistical inlier threshold) so it is
+    // unit-independent. New estimator — no prior behavior to preserve.
+    magsac->setReferenceThreshold(magsac::utils::DefaultPlanarEssentialMatrixEstimator::getSigmaQuantile() * sigma_max);
+    magsac->setCoreNumber(1);
+    magsac->setPartitionNumber(partition_num);
+    magsac->setIterationLimit(max_iters);
+    magsac->setMinimumIterationNumber(min_iters);
+
+    ModelScore score;
+
+    int num_tents = correspondencesArr.size() / 4;
+    cv::Mat points(num_tents, 4, CV_64F, &correspondencesArr[0]);
+
+    // Normalize points by intrinsics
+    cv::Mat normalized_points(points.size(), CV_64F);
+    gcransac::utils::normalizeCorrespondences(points, intrinsics_src, intrinsics_dst, normalized_points);
+
+    typedef gcransac::sampler::Sampler<cv::Mat, size_t> AbstractSampler;
+    std::unique_ptr<AbstractSampler> main_sampler;
+    if (sampler_id == 0)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::UniformSampler(&normalized_points));
+    else if (sampler_id == 1)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProsacSampler(&normalized_points, estimator.sampleSize()));
+    else { fprintf(stderr, "Unknown sampler: %d\n", sampler_id); return 0; }
+
+    bool success = magsac->run(normalized_points, conf, estimator, *main_sampler.get(), model, max_iters, score);
+
+    inliers.resize(num_tents);
+    if (!success) { for (int i = 0; i < num_tents; i++) inliers[i] = false; E.resize(9, 0); return 0; }
+
+    int num_inliers = 0;
+    for (int pt_idx = 0; pt_idx < num_tents; ++pt_idx) {
+        const int is_inlier = estimator.residual(normalized_points.row(pt_idx), model.descriptor) <= sigma_max;
+        inliers[pt_idx] = (bool)is_inlier;
+        num_inliers += is_inlier;
+    }
+
+    E.resize(9);
+    for (int i = 0; i < 9; i++) E[i] = (double)model.descriptor(i);
+
+    AbstractSampler *sampler_ptr = main_sampler.release();
+    delete sampler_ptr;
+    return num_inliers;
+}
+
+int findEssentialMatrixGravity_(std::vector<double>& correspondencesArr,
+    std::vector<bool>& inliers,
+    std::vector<double>& E,
+    std::vector<double>& src_K,
+    std::vector<double>& dst_K,
+    std::vector<double>& gravity_source,
+    std::vector<double>& gravity_destination,
+    std::vector<double>& inlier_probabilities,
+    int sampler_id,
+    bool use_magsac_plus_plus,
+    double sigma_max,
+    double conf,
+    int min_iters,
+    int max_iters,
+    int partition_num)
+{
+    Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>> intrinsics_src(&src_K[0]);
+    Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>> intrinsics_dst(&dst_K[0]);
+    Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>> gravity_src(&gravity_source[0]);
+    Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>> gravity_dst(&gravity_destination[0]);
+
+    magsac::utils::DefaultGravityEssentialMatrixEstimator estimator(intrinsics_src, intrinsics_dst);
+    estimator.getMutableMinimalSolver()->setGravity(gravity_src, gravity_dst);
+    gcransac::Model model;
+
+    MAGSAC<cv::Mat, magsac::utils::DefaultGravityEssentialMatrixEstimator> magsac_obj(use_magsac_plus_plus ?
+        MAGSAC<cv::Mat, magsac::utils::DefaultGravityEssentialMatrixEstimator>::MAGSAC_PLUS_PLUS :
+        MAGSAC<cv::Mat, magsac::utils::DefaultGravityEssentialMatrixEstimator>::MAGSAC_ORIGINAL);
+    auto* magsac = &magsac_obj;
+
+    magsac->setMaximumThreshold(sigma_max);
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale (k*sigma_max = the statistical inlier threshold) so it is
+    // unit-independent. New estimator — no prior behavior to preserve.
+    magsac->setReferenceThreshold(magsac::utils::DefaultGravityEssentialMatrixEstimator::getSigmaQuantile() * sigma_max);
+    magsac->setCoreNumber(1);
+    magsac->setPartitionNumber(partition_num);
+    magsac->setIterationLimit(max_iters);
+    magsac->setMinimumIterationNumber(min_iters);
+
+    ModelScore score;
+
+    int num_tents = correspondencesArr.size() / 4;
+    cv::Mat points(num_tents, 4, CV_64F, &correspondencesArr[0]);
+
+    cv::Mat normalized_points(points.size(), CV_64F);
+    gcransac::utils::normalizeCorrespondences(points, intrinsics_src, intrinsics_dst, normalized_points);
+
+    typedef gcransac::sampler::Sampler<cv::Mat, size_t> AbstractSampler;
+    std::unique_ptr<AbstractSampler> main_sampler;
+    if (sampler_id == 0)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::UniformSampler(&normalized_points));
+    else if (sampler_id == 1)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProsacSampler(&normalized_points, estimator.sampleSize()));
+    else { fprintf(stderr, "Unknown sampler: %d\n", sampler_id); return 0; }
+
+    bool success = magsac->run(normalized_points, conf, estimator, *main_sampler.get(), model, max_iters, score);
+
+    inliers.resize(num_tents);
+    if (!success) { for (int i = 0; i < num_tents; i++) inliers[i] = false; E.resize(9, 0); return 0; }
+
+    int num_inliers = 0;
+    for (int pt_idx = 0; pt_idx < num_tents; ++pt_idx) {
+        const int is_inlier = estimator.residual(normalized_points.row(pt_idx), model.descriptor) <= sigma_max;
+        inliers[pt_idx] = (bool)is_inlier;
+        num_inliers += is_inlier;
+    }
+
+    E.resize(9);
+    for (int i = 0; i < 9; i++) E[i] = (double)model.descriptor(i);
+
+    AbstractSampler *sampler_ptr = main_sampler.release();
+    delete sampler_ptr;
+    return num_inliers;
+}
+
 int findHomography_(std::vector<double>& correspondences,
                     std::vector<bool>& inliers,
                     std::vector<double>& H,
@@ -610,13 +1277,10 @@ int findHomography_(std::vector<double>& correspondences,
     magsac::utils::DefaultHomographyEstimator estimator; // The robust homography estimator class containing the function for the fitting and residual calculation
     gcransac::Homography model; // The estimated model
 
-    MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>* magsac;
-    if (use_magsac_plus_plus)
-        magsac = new MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>(
-            MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>::MAGSAC_PLUS_PLUS);
-    else
-        magsac = new MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>(
-            MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>::MAGSAC_ORIGINAL);
+    MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator> magsac_obj(use_magsac_plus_plus ?
+        MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>::MAGSAC_PLUS_PLUS :
+        MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>::MAGSAC_ORIGINAL);
+    auto* magsac = &magsac_obj;
 
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
