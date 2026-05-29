@@ -194,7 +194,7 @@ bool MAGSAC<DatumType, ModelEstimator>::run(
 	std::chrono::duration<double> elapsed_seconds; // Variables for time measuring: elapsed time
 	log_confidence = log(1.0 - confidence_); // The logarithm of 1 - confidence
 	point_number = points_.rows; // Number of points
-	constexpr size_t sample_size = estimator_.sampleSize(); // The sample size required for the estimation
+	constexpr size_t sample_size = ModelEstimator::sampleSize(); // The sample size required for the estimation
 	size_t max_iteration = iteration_limit; // The maximum number of iterations initialized to the iteration limit
 	int iteration = 0; // Current number of iterations
 	gcransac::Model so_far_the_best_model; // Current best model
@@ -376,7 +376,7 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensus(
 	constexpr double L = 1.05;
 	constexpr double k = ModelEstimator::getSigmaQuantile();
 	constexpr double threshold_to_sigma_multiplier = 1.0 / k;
-	constexpr size_t sample_size = estimator_.sampleSize();
+	constexpr size_t sample_size = ModelEstimator::sampleSize();
 	static auto comparator = [](std::pair<double, int> left, std::pair<double, int> right) { return left.first < right.first; };
 	const int point_number = points_.rows;
 	double current_maximum_sigma = this->maximum_threshold;
@@ -678,7 +678,7 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensusPlusPlus(
 	// TODO: check
 	constexpr double C = ModelEstimator::getC();
 	// The size of a minimal sample used for the estimation
-	constexpr size_t sample_size = estimator_.sampleSize();
+	constexpr size_t sample_size = ModelEstimator::sampleSize();
 	// Calculating 2^(DoF - 1) which will be used for the estimation and, 
 	// due to being constant, it is better to calculate it a priori.
 	static const double two_ad_dof = std::pow(2.0, dof_minus_one_per_two);
@@ -1053,7 +1053,7 @@ void MAGSAC<DatumType, ModelEstimator>::getModelQuality(
 	double &score_) // The score to be calculated
 {
 	// Set up the parameters
-	constexpr size_t sample_size = estimator_.sampleSize();
+	constexpr size_t sample_size = ModelEstimator::sampleSize();
 	const size_t point_number = points_.rows;
 
 	// Getting the inliers
