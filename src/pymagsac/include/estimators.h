@@ -653,6 +653,66 @@ namespace magsac
 				return 1.0 / (4.0 * getGammaFunction());
 			}
 		};
+
+		// This is the estimator class for estimating a 3D plane from a point cloud.
+		template<class _MinimalSolverEngine,  // The solver used for estimating the model from a minimal sample
+			class _NonMinimalSolverEngine> // The solver used for estimating the model from a non-minimal sample
+			class Plane3DEstimator :
+			public gcransac::estimator::LinearModelEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine, 3>
+		{
+		public:
+			using gcransac::estimator::LinearModelEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine, 3>::residual;
+
+			Plane3DEstimator() :
+				gcransac::estimator::LinearModelEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine, 3>()
+			{}
+
+			inline double residualForScoring(const cv::Mat& point_,
+                const gcransac::Model& model_) const
+			{
+				return residual(point_, model_.descriptor);
+			}
+
+			static constexpr double getSigmaQuantile()
+			{
+				return 3.64;
+			}
+			
+			static constexpr size_t getDegreesOfFreedom()
+			{
+				return 4;
+			}
+
+			static constexpr double getC()
+			{
+				return 0.25;
+			}
+
+			static constexpr double getGammaFunction()
+			{
+				return 1.0;
+			}
+
+			static constexpr bool doesNormalizationForNonMinimalFitting()
+			{
+				return false;
+			}
+
+			static constexpr double getUpperIncompleteGammaOfK()
+			{
+				return 0.0036572608340910764;
+			}
+
+			static constexpr double getLowerIncompleteGammaOfK()
+			{
+				return 1.3012265540498875;
+			}
+
+			static constexpr double getChiSquareParamCp()
+			{
+				return 1.0 / (4.0 * getGammaFunction());
+			}
+		};
 	}
 
 	namespace utils
@@ -681,5 +741,10 @@ namespace magsac
 		typedef estimator::Line2DEstimator<gcransac::estimator::solver::LinearModelSolver<2>, // The solver used for fitting a model to a minimal sample
 			gcransac::estimator::solver::LinearModelSolver<2>>  // The solver used for fitting a model to a non-minimal sample
 			Default2DLineEstimator;
+
+		// The default estimator for 3D plane fitting
+		typedef estimator::Plane3DEstimator<gcransac::estimator::solver::LinearModelSolver<3>, // The solver used for fitting a model to a minimal sample
+			gcransac::estimator::solver::LinearModelSolver<3>>  // The solver used for fitting a model to a non-minimal sample
+			Default3DPlaneEstimator;
 	}
 }

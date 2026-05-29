@@ -590,6 +590,105 @@ int findLine2D_(std::vector<double>& pointsArr,
     return num_inliers;
 }
 
+int findPlane3D_(std::vector<double>& pointsArr,
+    std::vector<bool>& inliers,
+    std::vector<double>& plane,
+    std::vector<double>& inlier_probabilities,
+    int sampler_id,
+    bool use_magsac_plus_plus,
+    double sigma_max,
+    double conf,
+    int min_iters,
+    int max_iters,
+    int partition_num)
+{
+    magsac::utils::Default3DPlaneEstimator estimator;
+    gcransac::Model model;
+
+    MAGSAC<cv::Mat, magsac::utils::Default3DPlaneEstimator>* magsac;
+    if (use_magsac_plus_plus)
+        magsac = new MAGSAC<cv::Mat, magsac::utils::Default3DPlaneEstimator>(
+            MAGSAC<cv::Mat, magsac::utils::Default3DPlaneEstimator>::MAGSAC_PLUS_PLUS);
+    else
+        magsac = new MAGSAC<cv::Mat, magsac::utils::Default3DPlaneEstimator>(
+            MAGSAC<cv::Mat, magsac::utils::Default3DPlaneEstimator>::MAGSAC_ORIGINAL);
+
+    magsac->setMaximumThreshold(sigma_max);
+    magsac->setCoreNumber(1);
+    magsac->setPartitionNumber(partition_num);
+    magsac->setIterationLimit(max_iters);
+    magsac->setMinimumIterationNumber(min_iters);
+
+    ModelScore score;
+
+    int num_tents = pointsArr.size() / 3;
+    cv::Mat points(num_tents, 3, CV_64F, &pointsArr[0]);
+
+    typedef gcransac::sampler::Sampler<cv::Mat, size_t> AbstractSampler;
+    std::unique_ptr<AbstractSampler> main_sampler;
+    if (sampler_id == 0)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::UniformSampler(&points));
+    else if (sampler_id == 1)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ProsacSampler(&points, estimator.sampleSize()));
+    else if (sampler_id == 3)
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::ImportanceSampler(&points,
+            inlier_probabilities,
+            estimator.sampleSize()));
+    else if (sampler_id == 4)
+    {
+        double variance = 0.1;
+        double max_prob = 0;
+        for (const auto &prob : inlier_probabilities)
+            max_prob = MAX(max_prob, prob);
+        for (auto &prob : inlier_probabilities)
+            prob /= max_prob;
+        main_sampler = std::unique_ptr<AbstractSampler>(new gcransac::sampler::AdaptiveReorderingSampler(&points,
+            inlier_probabilities,
+            estimator.sampleSize(),
+            variance));
+    }
+    else
+    {
+        fprintf(stderr, "Unknown sampler identifier: %d. The accepted samplers are 0 (uniform), 1 (PROSAC), 3 (NG-RANSAC), 4 (AR-Sampler)\n",
+            sampler_id);
+        return 0;
+    }
+
+    bool success = magsac->run(points,
+        conf,
+        estimator,
+        *main_sampler.get(),
+        model,
+        max_iters,
+        score);
+
+    inliers.resize(num_tents);
+    if (!success)
+    {
+        for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx)
+            inliers[pt_idx] = false;
+        plane.resize(4, 0);
+        return 0;
+    }
+
+    int num_inliers = 0;
+    for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx)
+    {
+        const int is_inlier = estimator.residual(points.row(pt_idx), model.descriptor) <= sigma_max;
+        inliers[pt_idx] = (bool)is_inlier;
+        num_inliers += is_inlier;
+    }
+
+    plane.resize(4);
+    for (int i = 0; i < 4; i++)
+        plane[i] = (double)model.descriptor(i);
+
+    AbstractSampler *sampler_ptr = main_sampler.release();
+    delete sampler_ptr;
+
+    return num_inliers;
+}
+
 int findHomography_(std::vector<double>& correspondences,
                     std::vector<bool>& inliers,
                     std::vector<double>& H,

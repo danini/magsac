@@ -392,6 +392,72 @@ py::tuple findLine2D(
     return py::make_tuple(line_, inliers_);
 }
 
+py::tuple findPlane3D(
+    py::array_t<double> points_,
+    py::array_t<double> probabilities_,
+    int sampler,
+    bool use_magsac_plus_plus,
+    double sigma_th,
+    double conf,
+    int min_iters,
+    int max_iters,
+    int partition_num)
+{
+    py::buffer_info buf1 = points_.request();
+    size_t NUM_TENTS = buf1.shape[0];
+    size_t DIM = buf1.shape[1];
+
+    if (DIM != 3)
+        throw std::invalid_argument("points should be an array with dims [n,3], n>=3");
+    if (NUM_TENTS < 3)
+        throw std::invalid_argument("points should be an array with dims [n,3], n>=3");
+
+    double* ptr1 = (double*)buf1.ptr;
+    std::vector<double> points;
+    points.assign(ptr1, ptr1 + buf1.size);
+
+    std::vector<double> plane(4);
+    std::vector<bool> inliers(NUM_TENTS);
+
+    std::vector<double> probabilities;
+    if (sampler == 3 || sampler == 4)
+    {
+        py::buffer_info buf_prob = probabilities_.request();
+        double* ptr_prob = (double*)buf_prob.ptr;
+        probabilities.assign(ptr_prob, ptr_prob + buf_prob.size);
+    }
+
+    int num_inl = findPlane3D_(
+        points,
+        inliers,
+        plane,
+        probabilities,
+        sampler,
+        use_magsac_plus_plus,
+        sigma_th,
+        conf,
+        min_iters,
+        max_iters,
+        partition_num);
+
+    py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
+    py::buffer_info buf3 = inliers_.request();
+    bool* ptr3 = (bool*)buf3.ptr;
+    for (size_t i = 0; i < NUM_TENTS; i++)
+        ptr3[i] = inliers[i];
+
+    if (num_inl == 0) {
+        return py::make_tuple(pybind11::cast<pybind11::none>(Py_None), inliers_);
+    }
+    py::array_t<double> plane_ = py::array_t<double>({4});
+    py::buffer_info buf2 = plane_.request();
+    double* ptr2 = (double*)buf2.ptr;
+    for (size_t i = 0; i < 4; i++)
+        ptr2[i] = plane[i];
+
+    return py::make_tuple(plane_, inliers_);
+}
+
 py::tuple findHomography(
     py::array_t<double>  correspondences_,
     double w1, 
@@ -553,6 +619,17 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("points"),
         py::arg("w1"),
         py::arg("h1"),
+        py::arg("probabilities"),
+		py::arg("sampler") = 0,
+        py::arg("use_magsac_plus_plus") = true,
+        py::arg("sigma_th") = 1.0,
+        py::arg("conf") = 0.99,
+        py::arg("min_iters") = 50,
+        py::arg("max_iters") = 1000,
+        py::arg("partition_num") = 5); 
+
+  m.def("findPlane3D", &findPlane3D, R"doc(some doc)doc",
+        py::arg("points"),
         py::arg("probabilities"),
 		py::arg("sampler") = 0,
         py::arg("use_magsac_plus_plus") = true,

@@ -91,3 +91,15 @@ int findRigidTransformation_(
     int min_iters,
     int max_iters,
     int partition_num);
+
+int findPlane3D_(std::vector<double>& points,
+    std::vector<bool>& inliers,
+    std::vector<double>& plane,
+    std::vector<double>& inlier_probabilities,
+    int sampler_id,
+    bool use_magsac_plus_plus,
+    double sigma_max,
+    double conf,
+    int min_iters,
+    int max_iters,
+    int partition_num);
