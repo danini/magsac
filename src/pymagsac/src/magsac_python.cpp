@@ -20,6 +20,23 @@
 
 #include <gflags/gflags.h>
 
+#include <cstdlib>
+#include <cstdint>
+
+// Make RANSAC sampling reproducible when seed >= 0, else restore nondeterministic
+// behavior. setGlobalSeed covers all UniformRandomGenerator-based samplers;
+// std::srand covers samplers/solvers that use std::rand()/Eigen::Random.
+void applyMagsacSeed(int seed)
+{
+    if (seed >= 0)
+    {
+        gcransac::utils::UniformRandomGenerator<size_t>::setGlobalSeed(static_cast<std::uint64_t>(seed));
+        std::srand(static_cast<unsigned>(seed));
+    }
+    else
+        gcransac::utils::UniformRandomGenerator<size_t>::clearGlobalSeed();
+}
+
 int findRigidTransformation_(
     std::vector<double>& correspondences,
     std::vector<bool>& inliers,
