@@ -4,12 +4,27 @@
 #include <iostream>
 #include <chrono>
 #include <memory>
+#include <cmath>
 #include "model.h"
 #include "model_score.h"
 #include "samplers/sampler.h"
 #include "samplers/uniform_sampler.h"
 #include <math.h> 
 #include "gamma_values.cpp"
+#if __has_include("gamma_values_dof1.cpp")
+#include "gamma_values_dof1.cpp"
+#define HAS_GAMMA_VALUES_DOF1 1
+#else
+// If building with a graph-cut-ransac submodule that has the DoF=1 table
+#if __has_include(<gamma_values_dof1.cpp>)
+#include <gamma_values_dof1.cpp>
+#define HAS_GAMMA_VALUES_DOF1 1
+#endif
+#endif
+
+#ifndef HAS_GAMMA_VALUES_DOF1
+#error "gamma_values_dof1.cpp not found. Required for correct MAGSAC scoring with DoF=1 models (plane, line)."
+#endif
 
 #ifdef _WIN32 
 	#include <ppl.h>
@@ -452,6 +467,10 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensus(
 	// Sort the residuals in ascending order
 	std::sort(all_residuals.begin(), all_residuals.end(), comparator);
 
+	// If no points are within the threshold, the model is invalid
+	if (all_residuals.empty())
+		return false;
+
 	// The maximum threshold is set to be slightly bigger than the distance of the
 	// farthest possible inlier.
 	current_maximum_sigma =
@@ -493,7 +512,7 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensus(
 			// Estimating the model which the current set of inliers imply
 			std::vector<gcransac::Model> sigma_models;
 			estimator_.estimateModelNonminimal(points_,
-				&(sigma_inliers)[0],
+				sigma_inliers.data(),
 				sigma_inlier_number,
 				&sigma_models);
 
@@ -607,12 +626,13 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensus(
 		return false;
 
 	// Estimate the model parameters using weighted least-squares fitting
-	if (!estimator_.estimateModelNonminimal(
+	if (sigma_inliers.empty() ||
+		!estimator_.estimateModelNonminimal(
 		points_, // All input points
-		&(sigma_inliers)[0], // Points which have higher than 0 probability of being inlier
+		sigma_inliers.data(), // Points which have higher than 0 probability of being inlier
 		static_cast<int>(sigma_inliers.size()), // Number of possible inliers
 		&sigma_models, // Estimated models
-		&(final_weights)[0])) // Weights of points 
+		final_weights.data())) // Weights of points 
 		return false;
 
 	bool is_model_updated = false;
@@ -624,7 +644,7 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensus(
 		if (!estimator_.isValidModel(sigma_model,
 			points_,
 			sigma_inliers,
-			&(sigma_inliers)[0],
+			sigma_inliers.data(),
 			interrupting_threshold,
 			is_model_updated)) // and it is valid
 			continue;
@@ -687,7 +707,13 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensusPlusPlus(
 	static const double C_times_two_ad_dof = C * two_ad_dof;
 	// Calculating the gamma value of (DoF - 1) / 2 which will be used for the estimation and, 
 	// due to being constant, it is better to calculate it a priori.
-	static const double gamma_value = tgamma(dof_minus_one_per_two);
+	// For DoF=1: Γ(0)=∞, use E₁(0.001) as finite proxy.
+	static const double gamma_value = []() {
+		if constexpr (degrees_of_freedom == 1)
+			return stored_gamma_values_dof1[1];
+		else
+			return std::tgamma(dof_minus_one_per_two);
+	}();
 	// Calculating the upper incomplete gamma value of (DoF - 1) / 2 with k^2 / 2.
 	constexpr double gamma_k = ModelEstimator::getUpperIncompleteGammaOfK();
 	// Calculating the lower incomplete gamma value of (DoF - 1) / 2 which will be used for the estimation and, 
@@ -773,10 +799,13 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensusPlusPlus(
 	// Occupy the memory to avoid doing it inside the calculation possibly multiple times
 	sigma_weights.reserve(possible_inlier_number);
 
+	// The weight's noise scale is sigma_max = threshold / k (per DoF); the inlier
+	// collection cutoff stays at current_maximum_sigma = maximum_threshold. (B3 fix.)
+	const double weight_sigma_max = current_maximum_sigma * threshold_to_sigma_multiplier;
 	// Calculate 2 * \sigma_{max}^2 a priori
-	const double squared_sigma_max_2 = current_maximum_sigma * current_maximum_sigma * 2.0;
+	const double squared_sigma_max_2 = weight_sigma_max * weight_sigma_max * 2.0;
 	// Divide C * 2^(DoF - 1) by \sigma_{max} a priori
-	const double one_over_sigma = C_times_two_ad_dof / current_maximum_sigma;
+	const double one_over_sigma = C_times_two_ad_dof / weight_sigma_max;
 	// Calculate the weight of a point with 0 residual (i.e., fitting perfectly) a priori
 	const double weight_zero = one_over_sigma * gamma_difference;
 
@@ -844,17 +873,43 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensusPlusPlus(
 			{
 				// Calculate the squared residual
 				const double squared_residual = residual * residual;
-				// Get the position of the gamma value in the lookup table
-				size_t x = round(precision_of_stored_gammas * squared_residual / squared_sigma_max_2);
+				// Get the position of the gamma value in the fine lookup table (B2 fix)
+				size_t x = round(precision_of_stored_incomplete_gammas * squared_residual / squared_sigma_max_2);
 				// Put the index of the point into the vector of points used for the least squares fitting
 				sigma_inliers.emplace_back(idx);
 
-				// If the sought gamma value is not stored in the lookup, return the closest element
-				if (stored_gamma_number < x)
-					x = stored_gamma_number;
+				// Look up the upper incomplete gamma Γ((DoF-1)/2, x) per DoF (fine table, B2 fix)
+				double gamma_at_x;
+				if constexpr (degrees_of_freedom == 1)
+				{
+					// If the sought gamma value is not stored in the lookup, return the closest element
+					if (stored_incomplete_gamma_number_dof1 < x) x = stored_incomplete_gamma_number_dof1;
+					gamma_at_x = stored_complete_gamma_values_dof1[x];
+				}
+				else if constexpr (degrees_of_freedom == 2)
+				{
+					// Γ(0.5, t) = √π · erfc(√t), where t = x * (1/10000)
+					gamma_at_x = 1.7724538509055159 * std::erfc(std::sqrt(static_cast<double>(x) * 0.0001));
+				}
+				else if constexpr (degrees_of_freedom == 3)
+				{
+					// Γ(1, t) = e^(-t)
+					gamma_at_x = std::exp(-static_cast<double>(x) * 0.0001);
+				}
+				else if constexpr (degrees_of_freedom == 4)
+				{
+					// If the sought gamma value is not stored in the lookup, return the closest element
+					if (stored_incomplete_gamma_number < x) x = stored_incomplete_gamma_number;
+					gamma_at_x = stored_complete_gamma_values[x];
+				}
+				else
+				{
+					static_assert(degrees_of_freedom >= 1 && degrees_of_freedom <= 4,
+						"Unsupported DoF: add a gamma table or closed-form expression for this value");
+				}
 
 				// Calculate the weight of the point
-				weight = one_over_sigma * (stored_gamma_values[x] - gamma_k);
+				weight = one_over_sigma * (gamma_at_x - gamma_k);
 			}
 
 			// Store the weight of the point 
@@ -870,12 +925,13 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensusPlusPlus(
 			return false;
 
 		// Estimate the model parameters using weighted least-squares fitting
-		if (!estimator_.estimateModelNonminimal(
+		if (sigma_inliers.empty() ||
+			!estimator_.estimateModelNonminimal(
 			points_, // All input points
-			&(sigma_inliers)[0], // Points which have higher than 0 probability of being inlier
+			sigma_inliers.data(), // Points which have higher than 0 probability of being inlier
 			static_cast<int>(sigma_inliers.size()), // Number of possible inliers
 			&sigma_models, // Estimated models
-			&(sigma_weights)[0])) // Weights of points 
+			sigma_weights.data())) // Weights of points 
 		{
 			// If the estimation failed and the iteration was never successfull,
 			// terminate with failure.
@@ -1020,13 +1076,70 @@ void MAGSAC<DatumType, ModelEstimator>::getModelQualityPlusPlus(
 			const double squared_residual_per_sigma = squared_residual / maximum_sigma_2_times_2;
 			// Get the position of the gamma value in the lookup table
 			size_t x = round(precision_of_stored_incomplete_gammas * squared_residual_per_sigma);
-			// If the sought gamma value is not stored in the lookup, return the closest element
-			if (stored_incomplete_gamma_number < x)
-				x = stored_incomplete_gamma_number;
+
+			// Look up upper incomplete gamma Γ((DoF-1)/2, x) — "complete" table
+			double complete_gamma_at_x;
+			if constexpr (degrees_of_freedom == 1)
+			{
+				// If the sought gamma value is not stored in the lookup, return the closest element
+				if (stored_incomplete_gamma_number_dof1 < x) x = stored_incomplete_gamma_number_dof1;
+				complete_gamma_at_x = stored_complete_gamma_values_dof1[x];
+			}
+			else if constexpr (degrees_of_freedom == 2)
+			{
+				// Γ(0.5, t) = √π · erfc(√t), t = x/10000
+				complete_gamma_at_x = 1.7724538509055159 * std::erfc(std::sqrt(static_cast<double>(x) * 0.0001));
+			}
+			else if constexpr (degrees_of_freedom == 3)
+			{
+				// Γ(1, t) = e^(-t)
+				complete_gamma_at_x = std::exp(-static_cast<double>(x) * 0.0001);
+			}
+			else if constexpr (degrees_of_freedom == 4)
+			{
+				// If the sought gamma value is not stored in the lookup, return the closest element
+				if (stored_incomplete_gamma_number < x) x = stored_incomplete_gamma_number;
+				complete_gamma_at_x = stored_complete_gamma_values[x];
+			}
+			else
+			{
+				static_assert(degrees_of_freedom >= 1 && degrees_of_freedom <= 4,
+					"Unsupported DoF: add a gamma table or closed-form expression for this value");
+			}
+
+			// Look up lower incomplete gamma γ((DoF+1)/2, x)
+			double lower_gamma_at_x;
+			if constexpr (degrees_of_freedom == 1)
+			{
+				// γ(1, t) = 1 - e^(-t)
+				lower_gamma_at_x = 1.0 - std::exp(-static_cast<double>(x) * 0.0001);
+			}
+			else if constexpr (degrees_of_freedom == 2)
+			{
+				// γ(1.5, t) = (√π/2)·erf(√t) - √t·e^(-t)
+				const double t = static_cast<double>(x) * 0.0001;
+				const double sqrt_t = std::sqrt(t);
+				lower_gamma_at_x = 0.8862269254527580 * std::erf(sqrt_t) - sqrt_t * std::exp(-t);
+			}
+			else if constexpr (degrees_of_freedom == 3)
+			{
+				// γ(2, t) = 1 - (1+t)·e^(-t)
+				const double t = static_cast<double>(x) * 0.0001;
+				lower_gamma_at_x = 1.0 - (1.0 + t) * std::exp(-t);
+			}
+			else if constexpr (degrees_of_freedom == 4)
+			{
+				lower_gamma_at_x = stored_lower_incomplete_gamma_values[x];
+			}
+			else
+			{
+				static_assert(degrees_of_freedom >= 1 && degrees_of_freedom <= 4,
+					"Unsupported DoF: add a gamma table or closed-form expression for this value");
+			}
 
 			// Calculate the loss implied by the current point
-			loss = maximum_sigma_2_per_2 * stored_lower_incomplete_gamma_values[x] +
-				squared_residual / 4.0 * (stored_complete_gamma_values[x] -
+			loss = maximum_sigma_2_per_2 * lower_gamma_at_x +
+				squared_residual / 4.0 * (complete_gamma_at_x -
 					gamma_value_of_k);
 			loss = loss * two_ad_dof_plus_one_per_maximum_sigma;
 		}
