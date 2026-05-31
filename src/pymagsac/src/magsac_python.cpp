@@ -42,6 +42,11 @@ int findRigidTransformation_(
         MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>::MAGSAC_ORIGINAL);
     auto* magsac = &magsac_obj;
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale so it is unit-independent (k*sigma_max = the statistical
+    // inlier threshold). Replaces the pixel-unit default of 1.0. Affects only
+    // the iteration budget, not the per-hypothesis weight/loss.
+    magsac->setReferenceThreshold(magsac::utils::DefaultRigidTransformationEstimator::getSigmaQuantile() * sigma_max);
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
     magsac->setIterationLimit(max_iters);
@@ -174,6 +179,11 @@ int findFundamentalMatrix_(
         MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>::MAGSAC_ORIGINAL);
     auto* magsac = &magsac_obj;
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale so it is unit-independent (k*sigma_max = the statistical
+    // inlier threshold). Replaces the pixel-unit default of 1.0. Affects only
+    // the iteration budget, not the per-hypothesis weight/loss.
+    magsac->setReferenceThreshold(magsac::utils::DefaultFundamentalMatrixEstimator::getSigmaQuantile() * sigma_max);
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
     magsac->setIterationLimit(max_iters);
@@ -348,7 +358,11 @@ int findEssentialMatrix_(std::vector<double>& correspondences,
     magsac.setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
     magsac.setIterationLimit(max_iters);
 	magsac.setMinimumIterationNumber(min_iters);
-    magsac.setReferenceThreshold(magsac.getReferenceThreshold() / threshold_normalizer); // The reference threshold inside MAGSAC++ should also be normalized.
+    // Reference threshold for the adaptive iteration count, derived from the
+    // (normalized) noise scale rather than rescaling the arbitrary 1.0 default:
+    // k*sigma_max = the statistical inlier threshold. Affects only the iteration
+    // budget, not the per-hypothesis weight/loss.
+    magsac.setReferenceThreshold(magsac::utils::DefaultEssentialMatrixEstimator::getSigmaQuantile() * normalized_sigma_max);
 	
 	// Initialize the samplers
 	// The main sampler is used for sampling in the main RANSAC loop
@@ -708,6 +722,11 @@ int findPnP_(std::vector<double>& correspondencesArr,
     auto* magsac = &magsac_obj;
 
     magsac->setMaximumThreshold(sigma_max);
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale so it is unit-independent (k*sigma_max = the statistical
+    // inlier threshold). Replaces the pixel-unit default of 1.0. Affects only
+    // the iteration budget, not the per-hypothesis weight/loss.
+    magsac->setReferenceThreshold(magsac::utils::DefaultPnPEstimator::getSigmaQuantile() * sigma_max);
     magsac->setCoreNumber(1);
     magsac->setPartitionNumber(partition_num);
     magsac->setIterationLimit(max_iters);
@@ -791,6 +810,11 @@ int findPnPAC_(std::vector<double>& correspondencesArr,
     auto* magsac = &magsac_obj;
 
     magsac->setMaximumThreshold(sigma_max);
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale so it is unit-independent (k*sigma_max = the statistical
+    // inlier threshold). Replaces the pixel-unit default of 1.0. Affects only
+    // the iteration budget, not the per-hypothesis weight/loss.
+    magsac->setReferenceThreshold(magsac::utils::DefaultACP1PEstimator::getSigmaQuantile() * sigma_max);
     magsac->setCoreNumber(1);
     magsac->setPartitionNumber(partition_num);
     magsac->setIterationLimit(max_iters);
@@ -844,6 +868,11 @@ int findPnPSIFT_(std::vector<double>& correspondencesArr,
     auto* magsac = &magsac_obj;
 
     magsac->setMaximumThreshold(sigma_max);
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale so it is unit-independent (k*sigma_max = the statistical
+    // inlier threshold). Replaces the pixel-unit default of 1.0. Affects only
+    // the iteration budget, not the per-hypothesis weight/loss.
+    magsac->setReferenceThreshold(magsac::utils::DefaultSIFTP1PEstimator::getSigmaQuantile() * sigma_max);
     magsac->setCoreNumber(1);
     magsac->setPartitionNumber(partition_num);
     magsac->setIterationLimit(max_iters);
@@ -902,6 +931,11 @@ int findRadialHomography_(std::vector<double>& correspondencesArr,
     auto* magsac = &magsac_obj;
 
     magsac->setMaximumThreshold(sigma_max);
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale so it is unit-independent (k*sigma_max = the statistical
+    // inlier threshold). Replaces the pixel-unit default of 1.0. Affects only
+    // the iteration budget, not the per-hypothesis weight/loss.
+    magsac->setReferenceThreshold(magsac::utils::DefaultRadialHomographyEstimator::getSigmaQuantile() * sigma_max);
     magsac->setCoreNumber(1);
     magsac->setPartitionNumber(partition_num);
     magsac->setIterationLimit(max_iters);
@@ -991,6 +1025,11 @@ int findHomographyAffine_(std::vector<double>& correspondencesArr,
     auto* magsac = &magsac_obj;
 
     magsac->setMaximumThreshold(sigma_max);
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale so it is unit-independent (k*sigma_max = the statistical
+    // inlier threshold). Replaces the pixel-unit default of 1.0. Affects only
+    // the iteration budget, not the per-hypothesis weight/loss.
+    magsac->setReferenceThreshold(magsac::utils::DefaultHomographyAffineEstimator::getSigmaQuantile() * sigma_max);
     magsac->setCoreNumber(1);
     magsac->setPartitionNumber(partition_num);
     magsac->setIterationLimit(max_iters);
@@ -1051,6 +1090,11 @@ int findFundamentalMatrixAffine_(std::vector<double>& correspondencesArr,
     auto* magsac = &magsac_obj;
 
     magsac->setMaximumThreshold(sigma_max);
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale so it is unit-independent (k*sigma_max = the statistical
+    // inlier threshold). Replaces the pixel-unit default of 1.0. Affects only
+    // the iteration budget, not the per-hypothesis weight/loss.
+    magsac->setReferenceThreshold(magsac::utils::DefaultFundamentalMatrixAffineSIFTEstimator::getSigmaQuantile() * sigma_max);
     magsac->setCoreNumber(1);
     magsac->setPartitionNumber(partition_num);
     magsac->setIterationLimit(max_iters);
@@ -1116,6 +1160,11 @@ int findEssentialMatrixPlanar_(std::vector<double>& correspondencesArr,
     auto* magsac = &magsac_obj;
 
     magsac->setMaximumThreshold(sigma_max);
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale so it is unit-independent (k*sigma_max = the statistical
+    // inlier threshold). Replaces the pixel-unit default of 1.0. Affects only
+    // the iteration budget, not the per-hypothesis weight/loss.
+    magsac->setReferenceThreshold(magsac::utils::DefaultPlanarEssentialMatrixEstimator::getSigmaQuantile() * sigma_max);
     magsac->setCoreNumber(1);
     magsac->setPartitionNumber(partition_num);
     magsac->setIterationLimit(max_iters);
@@ -1189,6 +1238,11 @@ int findEssentialMatrixGravity_(std::vector<double>& correspondencesArr,
     auto* magsac = &magsac_obj;
 
     magsac->setMaximumThreshold(sigma_max);
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale so it is unit-independent (k*sigma_max = the statistical
+    // inlier threshold). Replaces the pixel-unit default of 1.0. Affects only
+    // the iteration budget, not the per-hypothesis weight/loss.
+    magsac->setReferenceThreshold(magsac::utils::DefaultGravityEssentialMatrixEstimator::getSigmaQuantile() * sigma_max);
     magsac->setCoreNumber(1);
     magsac->setPartitionNumber(partition_num);
     magsac->setIterationLimit(max_iters);
@@ -1256,6 +1310,11 @@ int findHomography_(std::vector<double>& correspondences,
     auto* magsac = &magsac_obj;
 
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
+    // Reference threshold for the adaptive iteration count, derived from the
+    // noise scale so it is unit-independent (k*sigma_max = the statistical
+    // inlier threshold). Replaces the pixel-unit default of 1.0. Affects only
+    // the iteration budget, not the per-hypothesis weight/loss.
+    magsac->setReferenceThreshold(magsac::utils::DefaultHomographyEstimator::getSigmaQuantile() * sigma_max);
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
     magsac->setIterationLimit(max_iters);
