@@ -773,10 +773,14 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensusPlusPlus(
 	// Occupy the memory to avoid doing it inside the calculation possibly multiple times
 	sigma_weights.reserve(possible_inlier_number);
 
+	// The weight's noise scale is sigma_max = threshold / k (the paper convention,
+	// matching getModelQualityPlusPlus). The inlier-collection cutoff stays at
+	// current_maximum_sigma = maximum_threshold = k * sigma_max. (B3 fix.)
+	const double weight_sigma_max = current_maximum_sigma * threshold_to_sigma_multiplier;
 	// Calculate 2 * \sigma_{max}^2 a priori
-	const double squared_sigma_max_2 = current_maximum_sigma * current_maximum_sigma * 2.0;
+	const double squared_sigma_max_2 = weight_sigma_max * weight_sigma_max * 2.0;
 	// Divide C * 2^(DoF - 1) by \sigma_{max} a priori
-	const double one_over_sigma = C_times_two_ad_dof / current_maximum_sigma;
+	const double one_over_sigma = C_times_two_ad_dof / weight_sigma_max;
 	// Calculate the weight of a point with 0 residual (i.e., fitting perfectly) a priori
 	const double weight_zero = one_over_sigma * gamma_difference;
 
@@ -844,17 +848,19 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensusPlusPlus(
 			{
 				// Calculate the squared residual
 				const double squared_residual = residual * residual;
-				// Get the position of the gamma value in the lookup table
-				size_t x = round(precision_of_stored_gammas * squared_residual / squared_sigma_max_2);
+				// Get the position of the gamma value in the lookup table.
+				// Use the fine table (step 1e-4) with its matching precision
+				// constant, so the index maps to the true argument. (B2 fix.)
+				size_t x = round(precision_of_stored_incomplete_gammas * squared_residual / squared_sigma_max_2);
 				// Put the index of the point into the vector of points used for the least squares fitting
 				sigma_inliers.emplace_back(idx);
 
 				// If the sought gamma value is not stored in the lookup, return the closest element
-				if (stored_gamma_number < x)
-					x = stored_gamma_number;
+				if (stored_incomplete_gamma_number < x)
+					x = stored_incomplete_gamma_number;
 
 				// Calculate the weight of the point
-				weight = one_over_sigma * (stored_gamma_values[x] - gamma_k);
+				weight = one_over_sigma * (stored_complete_gamma_values[x] - gamma_k);
 			}
 
 			// Store the weight of the point 
