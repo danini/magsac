@@ -1,0 +1,7 @@
+# Dependencies for the MAGSAC++ benchmark scripts (benchmarks/).
+# pymagsac itself is provided by the built/installed package, not listed here.
+numpy            # synthetic benchmarks (always required)
+scipy            # AdelaideRMF / kusvod2 .mat loaders
+matplotlib       # reproduce_paper.py figures (CDF, error-vs-threshold)
+opencv-python    # cv2:* baseline backends (RANSAC/LMedS/USAC) + image-pair loader
+                 # (opencv-python-headless also works, e.g. on CI / servers)
