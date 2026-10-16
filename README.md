@@ -55,9 +55,11 @@ Thanks to [@akaszynski](https://github.com/akaszynski) for his contributions.
 To build and install C++-only `MAGSAC`/`MAGSAC++`, clone or download this repository and then build the project by CMAKE. 
 ```shell
 $ git clone https://github.com/danini/magsac --recursive
+$ cd magsac
+$ mkdir build
 $ cd build
 $ cmake ..
-$ make
+$ cmake --build .
 ```
 
 # Install Python package and compile C++
@@ -91,7 +93,7 @@ An example comparing different samplers on fundamental matrix estimation is avai
 # Requirements
 
 - Eigen 3.0 or higher
-- CMake 2.8.12 or higher
+- CMake 3.15 or higher (required by the bundled pybind11)
 - OpenCV 3.0 or higher
 - A modern compiler with C++17 support
 - GFlags

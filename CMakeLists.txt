@@ -156,6 +156,7 @@ if (CREATE_SAMPLE_PROJECT)
 
 	add_executable(SampleProject
 		examples/cpp_example.cpp)
+	target_compile_definitions(SampleProject PRIVATE CREATE_SAMPLE_PROJECT)
 		
 	target_link_libraries(SampleProject PUBLIC
 		${PROJECT_NAME}
