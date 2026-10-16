@@ -25,7 +25,8 @@ Compiling
 ---------
 
 ```shell
-$ git clone https://github.com/danini/magsac
+$ git clone https://github.com/danini/magsac --recursive
+$ cd magsac
 $ mkdir build
 $ cd build
 $ cmake-gui ..
