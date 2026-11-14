@@ -1,5 +1,6 @@
 #include <stdexcept>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include <pybind11/stl_bind.h>
 #include <pybind11/numpy.h>
 #include "magsac_python.hpp"
@@ -9,14 +10,13 @@ namespace py = pybind11;
 
 // The optional reference_th argument: None gives the default (a value <= 0 for
 // the C++ functions).
-static double referenceThreshold(const py::object &reference_th)
+static double referenceThreshold(std::optional<double> reference_th)
 {
-    if (reference_th.is_none())
+    if (!reference_th)
         return -1.0;
-    const double threshold = reference_th.cast<double>();
-    if (!(threshold > 0))
+    if (!(*reference_th > 0))
         throw std::invalid_argument("reference_th should be positive, or None");
-    return threshold;
+    return *reference_th;
 }
 
 py::tuple adaptiveInlierSelection(
@@ -102,7 +102,7 @@ py::tuple findRigidTransformation(
     int min_iters,
     int max_iters,
     int partition_num,
-    py::object reference_th)
+    std::optional<double> reference_th)
 {
 	py::buffer_info buf1 = correspondences_.request();
 	size_t NUM_TENTS = buf1.shape[0];
@@ -174,7 +174,7 @@ py::tuple findFundamentalMatrix(
     int min_iters,
     int max_iters,
     int partition_num,
-    py::object reference_th)
+    std::optional<double> reference_th)
 {
 	py::buffer_info buf1 = correspondences_.request();
 	size_t NUM_TENTS = buf1.shape[0];
@@ -252,7 +252,7 @@ py::tuple findEssentialMatrix(
     int min_iters,
     int max_iters,
     int partition_num,
-    py::object reference_th)
+    std::optional<double> reference_th)
 {
 	py::buffer_info buf1 = correspondences_.request();
 	size_t NUM_TENTS = buf1.shape[0];
@@ -352,7 +352,7 @@ py::tuple findLine2D(
     int min_iters,
     int max_iters,
     int partition_num,
-    py::object reference_th)
+    std::optional<double> reference_th)
 {
     py::buffer_info buf1 = points_.request();
 	size_t NUM_TENTS = buf1.shape[0];
@@ -426,7 +426,7 @@ py::tuple findHomography(
     int min_iters,
     int max_iters,
     int partition_num,
-    py::object reference_th)
+    std::optional<double> reference_th)
 {
 	py::buffer_info buf1 = correspondences_.request();
 	size_t NUM_TENTS = buf1.shape[0];
@@ -470,7 +470,7 @@ py::tuple findHomography(
                     min_iters,
                     max_iters,
                     partition_num,
-        referenceThreshold(reference_th));
+                    referenceThreshold(reference_th));
     
     py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
     py::buffer_info buf3 = inliers_.request();
@@ -519,7 +519,8 @@ Returns (E, inlier mask); E is None on failure.
 sigma_th: the inlier threshold, in pixels: the largest residual of an inlier
 (MAGSAC++'s noise scale sigma_max is sigma_th / 3.64).
 reference_th: a threshold, in pixels, for the inliers counted to set the number
-of iterations, and of the symmetric epipolar check of the models. None (default): min(sigma_th, 1).)doc",
+of iterations, and of the symmetric epipolar check of the models. None (default):
+min(sigma_th, 1), which assumes pixels: in other units, pass 1 px in those units.)doc",
         py::arg("correspondences"),
         py::arg("K1"),
         py::arg("K2"),
@@ -543,7 +544,8 @@ Returns (F, inlier mask); F is None on failure.
 sigma_th: the inlier threshold, in pixels: the largest residual of an inlier
 (MAGSAC++'s noise scale sigma_max is sigma_th / 3.64).
 reference_th: a threshold, in pixels, for the inliers counted to set the number
-of iterations, and of the symmetric epipolar check of the models. None (default): min(sigma_th, 1).)doc",
+of iterations, and of the symmetric epipolar check of the models. None (default):
+min(sigma_th, 1), which assumes pixels: in other units, pass 1 px in those units.)doc",
         py::arg("correspondences"),
         py::arg("w1"),
         py::arg("h1"),
@@ -583,7 +585,8 @@ Returns (H, inlier mask); H is None on failure.
 sigma_th: the inlier threshold, in pixels: the largest residual of an inlier
 (MAGSAC++'s noise scale sigma_max is sigma_th / 3.64).
 reference_th: a threshold, in pixels, for the inliers counted to set the number
-of iterations. None (default): min(sigma_th, 1).)doc",
+of iterations. None (default): min(sigma_th, 1), which assumes pixels: in other
+units, pass 1 px in those units.)doc",
         py::arg("correspondences"),
         py::arg("w1"),
         py::arg("h1"),
@@ -602,10 +605,11 @@ of iterations. None (default): min(sigma_th, 1).)doc",
   m.def("findLine2D", &findLine2D, R"doc(Estimates a 2D line with MAGSAC or MAGSAC++.
 Returns (line, inlier mask); line is None on failure.
 
-sigma_th: the inlier threshold, in the data's units: the largest residual of an
-inlier (MAGSAC++'s noise scale sigma_max is sigma_th / 3.64).
-reference_th: a threshold, in the data's units, for the inliers counted to set
-the number of iterations. None (default): sigma_th.)doc",
+sigma_th: the inlier threshold, in pixels: the largest residual of an inlier
+(MAGSAC++'s noise scale sigma_max is sigma_th / 3.64).
+reference_th: a threshold, in pixels, for the inliers counted to set the number
+of iterations. None (default): min(sigma_th, 1), which assumes pixels: in other
+units, pass 1 px in those units.)doc",
         py::arg("points"),
         py::arg("w1"),
         py::arg("h1"),

@@ -60,7 +60,7 @@ int findHomography_(std::vector<double>& correspondences,
                     int min_iters,
                     int max_iters,
                     int partition_num,
-    double reference_th); // <= 0: the default (see magsac_python.cpp)
+                    double reference_th); // <= 0: the default (see magsac_python.cpp)
 
 int findEssentialMatrix_(std::vector<double>& correspondences,
     std::vector<bool>& inliers,
