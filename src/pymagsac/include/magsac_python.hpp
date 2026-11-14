@@ -95,19 +95,6 @@ int findRigidTransformation_(
 // The common parameters of the functions below are those of findLine2D_. Each returns
 // the number of inliers, or 0 if no model was found; matrices are returned row-major.
 
-// Fits a plane (a, b, c, d), with ax + by + cz + d = 0 and a unit normal, to rows (x, y, z).
-int findPlane3D_(std::vector<double>& points,
-    std::vector<bool>& inliers,
-    std::vector<double>& plane,
-    std::vector<double>& inlier_probabilities,
-    int sampler_id,
-    bool use_magsac_plus_plus,
-    double sigma_max,
-    double conf,
-    int min_iters,
-    int max_iters,
-    int partition_num);
-
 // Fits a camera pose [R | t] (3x4) to rows (u, v, x, y, z): a point (u, v) in normalized
 // image coordinates and the 3D point (x, y, z) it sees. The threshold is in normalized coordinates.
 int findPnP_(std::vector<double>& correspondences,

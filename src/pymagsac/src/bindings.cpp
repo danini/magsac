@@ -514,18 +514,6 @@ namespace
     }
 }
 
-py::tuple findPlane3D(DoubleArray points_, DoubleArray probabilities_, int sampler, bool use_magsac_plus_plus,
-    double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
-{
-    std::vector<double> points = readRows(points_, 3, 3, "points");
-    std::vector<double> probabilities = readProbabilities(sampler, probabilities_);
-    std::vector<bool> inliers;
-    std::vector<double> plane;
-    const int num_inliers = findPlane3D_(points, inliers, plane, probabilities, sampler, use_magsac_plus_plus,
-        sigma_th, conf, min_iters, max_iters, partition_num);
-    return py::make_tuple(toArray(num_inliers, plane, { 4 }), toMask(inliers));
-}
-
 py::tuple findPnP(DoubleArray correspondences_, DoubleArray probabilities_, int sampler, bool use_magsac_plus_plus,
     double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
 {
@@ -684,18 +672,6 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
         py::arg("partition_num") = 5); 
-
-  m.def("findPlane3D", &findPlane3D, R"doc(Fits a plane (a, b, c, d), with ax + by + cz + d = 0 and a unit normal (a, b, c), to points [n,3].
-Returns (plane, mask).)doc",
-        py::arg("points"),
-        py::arg("probabilities"),
-        py::arg("sampler") = 0,
-        py::arg("use_magsac_plus_plus") = true,
-        py::arg("sigma_th") = 1.0,
-        py::arg("conf") = 0.99,
-        py::arg("min_iters") = 50,
-        py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5);
 
   m.def("findPnP", &findPnP, R"doc(Fits a camera pose [R | t] (3x4), x_camera = R x_world + t, to correspondences [n,5]: (u, v, x, y, z),
 where (u, v) are normalized image coordinates (K^-1 applied) and (x, y, z) the world point. sigma_th is in normalized coordinates.

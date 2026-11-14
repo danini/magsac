@@ -943,28 +943,6 @@ namespace
     }
 }
 
-int findPlane3D_(std::vector<double>& pointsArr,
-    std::vector<bool>& inliers,
-    std::vector<double>& plane,
-    std::vector<double>& inlier_probabilities,
-    int sampler_id,
-    bool use_magsac_plus_plus,
-    double sigma_max,
-    double conf,
-    int min_iters,
-    int max_iters,
-    int partition_num)
-{
-    cv::Mat points(pointsArr.size() / 3, 3, CV_64F, &pointsArr[0]);
-    magsac::utils::Default3DPlaneEstimator estimator;
-    gcransac::Model model;
-    const int num_inliers = runMagsac(points, estimator, inlier_probabilities, sampler_id, use_magsac_plus_plus,
-        sigma_max, 1.0, conf, min_iters, max_iters, partition_num, model, inliers);
-    if (num_inliers > 0)
-        plane = toRowMajor(model.descriptor);
-    return num_inliers;
-}
-
 int findPnP_(std::vector<double>& correspondences,
     std::vector<bool>& inliers,
     std::vector<double>& pose,
