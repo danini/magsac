@@ -147,6 +147,19 @@ def test_plane_fitting_samplers(sampler):
     check_plane(plane, mask, [0.3, -0.7, 0.5], 3.0, 300)
 
 
+@pytest.mark.parametrize("sampler", [1, 3])
+def test_plane_fitting_samples_with_a_repeated_point(sampler):
+    """Samples that repeat a point define no plane and must be rejected. PROSAC's first sample
+    repeats a point in about one run in three, and NG-RANSAC's samples often do when one point
+    has most of the probability (here 1000 of about 1280)."""
+    points, gt_mask = generate_plane_data([0.3, -0.7, 0.5], offset=3.0, n_inliers=300, n_outliers=100, noise_std=0.005)
+    probabilities = np.where(gt_mask, 0.9, 0.1)
+    probabilities[0] = 1000
+    for _ in range(30 if sampler == 1 else 10):
+        plane, mask = pymagsac.findPlane3D(points, probabilities, sampler=sampler, sigma_th=0.05, min_iters=500, max_iters=5000)
+        check_plane(plane, mask, [0.3, -0.7, 0.5], 3.0, 300)
+
+
 def test_plane_fitting_insufficient_points():
     """Test that plane fitting raises with fewer than 3 points."""
     points = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
