@@ -839,7 +839,11 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensusPlusPlus(
 			double weight = 0.0;
 			// If the residual is ~0, the point fits perfectly and it is handled differently
 			if (residual < std::numeric_limits<double>::epsilon())
+			{
 				weight = weight_zero;
+				// Put the index of the point into the vector of points used for the least squares fitting
+				sigma_inliers.emplace_back(idx);
+			}
 			else
 			{
 				// Calculate the squared residual
