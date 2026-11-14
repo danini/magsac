@@ -3,14 +3,13 @@
 Run: python -m pytest test_datasets.py
 """
 import os
-import tempfile
 import datasets
 
 DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
 
 
-def test_both_formats():
-    d = tempfile.mkdtemp()
+def test_both_formats(tmp_path):
+    d = str(tmp_path)
     with open(os.path.join(d, "a_pts.txt"), "w") as f:
         f.write("10 20 1 12 22 1 1\n30 40 1 99 99 1 0\n")
     with open(os.path.join(d, "b_pts.txt"), "w") as f:

@@ -14,7 +14,7 @@ the problems):
 Real data (--data DIR, with --task fundamental or homography): every
 '<scene>_pts.txt' in DIR: data/fundamental_matrix, data/homography (the homogr
 dataset) or data/homography/extremeview (EVD). `err` is then the RMSE over the
-annotated inliers, as in examples/cpp_example.cpp, and the medians are over runs.
+manually labelled inliers, and the medians are over runs.
 
 Examples
   python run_benchmark.py --quick
@@ -43,7 +43,7 @@ METRICS = ["err", "gt_err", "F1", "fail", "time_ms"]
 
 
 def estimate(task, data, args, sigma):
-    """Runs pymagsac; returns (model or None, inlier mask, time in ms)."""
+    """Runs pymagsac; returns (3x3 model or None, inlier mask, time in ms)."""
     options = dict(sampler=args.sampler, use_magsac_plus_plus=not args.magsac,
                    sigma_th=sigma, conf=0.99, min_iters=50, max_iters=args.max_iters)
     # Image sizes are only used by the P-NAPSAC and AR samplers' grids.
@@ -51,12 +51,14 @@ def estimate(task, data, args, sigma):
     start = time.perf_counter()
     model, mask = TASKS[task][0](data, *size, np.array([]), **options)
     ms = (time.perf_counter() - start) * 1e3
-    if model is None:
-        return None, None, ms
-    return np.asarray(model, float).reshape(3, 3), np.asarray(mask, bool), ms
+    return model, mask, ms
 
 
 def summarize(rows):
+    for r in rows:  # a degenerate model can give non-finite residuals: count it as a failure
+        if r["err"] is not None and not np.isfinite(r["err"]):
+            r.update({k: None for k in ("err", "gt_err", "F1") if k in r})
+
     def median(key):
         values = [r[key] for r in rows if r[key] is not None]
         return round(float(np.median(values)), 4) if values else float("nan")
@@ -75,8 +77,7 @@ def run_synthetic(task, args):
             runs = []
             for seed in range(args.runs):
                 rng = np.random.default_rng(seed)
-                data, clean = generate(rng, args.inliers, ratio, noise)
-                true = np.arange(len(data)) < len(clean)
+                data, clean, true = generate(rng, args.inliers, ratio, noise)
                 model, mask, ms = estimate(task, data, args, sigma)
                 ok = model is not None
                 runs.append({"err": syn.rmse(residual(data[true], model)) if ok else None,
@@ -115,7 +116,9 @@ def compare(path_a, path_b):
     keys, a = load(path_a)
     _, b = load(path_b)
     metrics = [m for m in METRICS if m in next(iter(a.values()))]
-    print(f"B - A, with A = {path_a} and B = {path_b} (lower err is better)")
+    print(f"B - A, with A = {path_a} and B = {path_b}")
+    if a.keys() ^ b.keys():
+        print(f"warning: {len(a.keys() ^ b.keys())} rows are in only one of the files")
     print(" ".join(f"{k:>18}" for k in keys) + " | " + " ".join(f"{m:>8}" for m in metrics))
     for k in sorted(a.keys() & b.keys()):
         diffs = []
@@ -135,8 +138,8 @@ def main():
     ap.add_argument("--sigma", type=float,
                     help="maximum sigma (default: 3 on synthetic data; on real data, "
                          "the values of examples/cpp_example.cpp: 5 for F, 50 for H)")
-    ap.add_argument("--sampler", type=int, default=0,
-                    help="0 uniform, 1 PROSAC, 2 P-NAPSAC, 3 importance, 4 AR-Sampler")
+    ap.add_argument("--sampler", type=int, default=0, choices=[0, 1, 2],
+                    help="0 uniform, 1 PROSAC, 2 P-NAPSAC")
     ap.add_argument("--max-iters", type=int, default=10000)
     ap.add_argument("--inliers", type=int, default=200, help="inliers per synthetic problem")
     ap.add_argument("--runs", type=int, default=100,
@@ -151,6 +154,8 @@ def main():
         if args.task == "all":
             ap.error("--data needs --task fundamental or --task homography")
         rows = list(run_real(args.task, args))
+        if not rows:
+            ap.error(f"no '<scene>_pts.txt' file in {args.data}")
         print_rows(rows)
         print(f"{len(rows)} scenes, median err {np.nanmedian([r['err'] for r in rows]):.2f} px")
     else:

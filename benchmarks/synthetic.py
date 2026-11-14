@@ -1,8 +1,9 @@
 """Synthetic problems with known ground truth, and the residuals used to score them.
 
-Each generator returns (data, clean): `data` holds the noisy inliers first, then
-uniform outliers; `clean` holds the same inliers without noise, so the residual
-of an estimated model on `clean` measures its distance to the true model.
+Each generator returns (data, clean, inlier): `data` holds the noisy inliers and
+uniform outliers in random order, `inlier` marks the inliers, and `clean` holds
+the same inliers without noise, so the residual of an estimated model on `clean`
+measures its distance to the true model.
 """
 import numpy as np
 
@@ -21,7 +22,9 @@ def _add_noise_and_outliers(rng, clean, outlier_ratio, noise):
     n_out = int(round(len(clean) * outlier_ratio / (1 - outlier_ratio)))
     noisy = clean + rng.normal(0, noise, clean.shape)
     outliers = rng.uniform(0, W, (n_out, clean.shape[1]))
-    return np.ascontiguousarray(np.vstack([noisy, outliers])), clean
+    order = rng.permutation(len(clean) + n_out)
+    inlier = order < len(clean)
+    return np.ascontiguousarray(np.vstack([noisy, outliers])[order]), clean[order[inlier]], inlier
 
 
 def gen_fundamental(rng, n, outlier_ratio, noise):
