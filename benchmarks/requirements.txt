@@ -1,0 +1,3 @@
+# The benchmark also needs pymagsac, built or installed from this repository.
+numpy
+pytest  # for test_datasets.py
