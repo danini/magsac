@@ -448,12 +448,23 @@ int findEssentialMatrix_(std::vector<double>& correspondences,
     {   
         std::vector<gcransac::Model> models = { model };
 		gcransac::estimator::solver::EssentialMatrixBundleAdjustmentSolver bundleOptimizer;
-		bundleOptimizer.estimateModel(
+		if (bundleOptimizer.estimateModel(
 			normalized_points,
 			&inlier_indices[0],
 			inlier_indices.size(),
 			models,
-			&weights[0]);
+			&weights[0]))
+        {
+            // Return the refined model, and its inliers
+            model.descriptor = models[0].descriptor;
+            num_inliers = 0;
+            for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx) {
+                const int is_inlier =
+                    estimator.residual(normalized_points.row(pt_idx), model.descriptor) <= normalized_sigma_max;
+                inliers[pt_idx] = (bool)is_inlier;
+                num_inliers += is_inlier;
+            }
+        }
     }
 			
 
