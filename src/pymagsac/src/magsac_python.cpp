@@ -45,10 +45,9 @@ int findRigidTransformation_(
         magsac = new MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>(
             MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>::MAGSAC_ORIGINAL);
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
-    // Reference threshold for the adaptive iteration count, derived from the noise
-    // scale (k*sigma_max = the statistical inlier threshold) instead of the
-    // pixel-unit default of 1.0, so the iteration budget is unit-independent.
-    magsac->setReferenceThreshold(magsac::utils::DefaultRigidTransformationEstimator::getSigmaQuantile() * sigma_max);
+    // The reference threshold counts the inliers that set the number of iterations:
+    // use the inlier threshold, in the data's units, instead of the default 1.0.
+    magsac->setReferenceThreshold(sigma_max);
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
     magsac->setIterationLimit(max_iters);
@@ -184,10 +183,9 @@ int findFundamentalMatrix_(
         magsac = new MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>(
             MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>::MAGSAC_ORIGINAL);
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
-    // Reference threshold for the adaptive iteration count, derived from the noise
-    // scale (k*sigma_max = the statistical inlier threshold) instead of the
-    // pixel-unit default of 1.0, so the iteration budget is unit-independent.
-    magsac->setReferenceThreshold(magsac::utils::DefaultFundamentalMatrixEstimator::getSigmaQuantile() * sigma_max);
+    // The reference threshold counts the inliers that set the number of iterations:
+    // use the inlier threshold, in the data's units, instead of the default 1.0.
+    magsac->setReferenceThreshold(sigma_max);
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
     magsac->setIterationLimit(max_iters);
@@ -362,11 +360,9 @@ int findEssentialMatrix_(std::vector<double>& correspondences,
     magsac.setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
     magsac.setIterationLimit(max_iters);
 	magsac.setMinimumIterationNumber(min_iters);
-    // Reference threshold for the adaptive iteration count, derived from the
-    // (normalized) noise scale rather than rescaling the arbitrary 1.0 default:
-    // k*sigma_max = the statistical inlier threshold, so the iteration budget is
-    // unit-independent.
-    magsac.setReferenceThreshold(magsac::utils::DefaultEssentialMatrixEstimator::getSigmaQuantile() * normalized_sigma_max);
+    // The reference threshold counts the inliers that set the number of iterations:
+    // use the inlier threshold, normalized like the maximum threshold, instead of 1 px.
+    magsac.setReferenceThreshold(normalized_sigma_max);
 	
 	// Initialize the samplers
 	// The main sampler is used for sampling in the main RANSAC loop
@@ -511,10 +507,9 @@ int findLine2D_(std::vector<double>& pointsArr,
             MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>::MAGSAC_ORIGINAL);
 
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
-    // Reference threshold for the adaptive iteration count, derived from the noise
-    // scale (k*sigma_max = the statistical inlier threshold) instead of the
-    // pixel-unit default of 1.0, so the iteration budget is unit-independent.
-    magsac->setReferenceThreshold(magsac::utils::Default2DLineEstimator::getSigmaQuantile() * sigma_max);
+    // The reference threshold counts the inliers that set the number of iterations:
+    // use the inlier threshold, in the data's units, instead of the default 1.0.
+    magsac->setReferenceThreshold(sigma_max);
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
     magsac->setIterationLimit(max_iters);
@@ -635,10 +630,9 @@ int findHomography_(std::vector<double>& correspondences,
             MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>::MAGSAC_ORIGINAL);
 
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
-    // Reference threshold for the adaptive iteration count, derived from the noise
-    // scale (k*sigma_max = the statistical inlier threshold) instead of the
-    // pixel-unit default of 1.0, so the iteration budget is unit-independent.
-    magsac->setReferenceThreshold(magsac::utils::DefaultHomographyEstimator::getSigmaQuantile() * sigma_max);
+    // The reference threshold counts the inliers that set the number of iterations:
+    // use the inlier threshold, in the data's units, instead of the default 1.0.
+    magsac->setReferenceThreshold(sigma_max);
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
     magsac->setIterationLimit(max_iters);
