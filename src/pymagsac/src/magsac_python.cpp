@@ -571,7 +571,7 @@ int findLine2D_(std::vector<double>& pointsArr,
     int num_inliers = 0;
     for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx) 
     {
-        const int is_inlier = sqrt(estimator.residual(points.row(pt_idx), model.descriptor)) <= sigma_max;
+        const int is_inlier = estimator.residual(points.row(pt_idx), model.descriptor) <= sigma_max;
         inliers[pt_idx] = (bool)is_inlier;
         num_inliers += is_inlier;
     }
@@ -694,7 +694,7 @@ int findHomography_(std::vector<double>& correspondences,
 
     int num_inliers = 0;
     for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx) {
-        const int is_inlier = sqrt(estimator.residual(points.row(pt_idx), model.descriptor)) <= sigma_max;
+        const int is_inlier = estimator.residual(points.row(pt_idx), model.descriptor) <= sigma_max;
         inliers[pt_idx] = (bool)is_inlier;
         num_inliers+=is_inlier;
     }
