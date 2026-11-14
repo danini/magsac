@@ -467,6 +467,57 @@ py::tuple findHomography(
     
     return py::make_tuple(H_,inliers_);
                          }
+namespace
+{
+    typedef py::array_t<double, py::array::c_style | py::array::forcecast> DoubleArray;
+
+    // Copies an array of dims [n, cols], n >= min_rows, to a row-major vector.
+    std::vector<double> readRows(const DoubleArray& array, py::ssize_t cols, py::ssize_t min_rows, const char* what)
+    {
+        if (array.ndim() != 2 || array.shape(1) != cols || array.shape(0) < min_rows)
+            throw std::invalid_argument(std::string(what) + " should be an array with dims [n," +
+                std::to_string(cols) + "], n>=" + std::to_string(min_rows));
+        return std::vector<double>(array.data(), array.data() + array.size());
+    }
+
+    // The inlier probabilities, used only by samplers 3 (NG-RANSAC) and 4 (AR-Sampler).
+    std::vector<double> readProbabilities(int sampler, const DoubleArray& probabilities)
+    {
+        if (sampler != 3 && sampler != 4)
+            return {};
+        return std::vector<double>(probabilities.data(), probabilities.data() + probabilities.size());
+    }
+
+    // The model as an array of the given shape, or None if no model was found.
+    py::object toArray(int num_inliers, const std::vector<double>& values, std::vector<py::ssize_t> shape)
+    {
+        if (num_inliers == 0)
+            return py::none();
+        DoubleArray array(shape);
+        std::copy(values.begin(), values.end(), array.mutable_data());
+        return std::move(array);
+    }
+
+    py::array_t<bool> toMask(const std::vector<bool>& inliers)
+    {
+        py::array_t<bool> mask(inliers.size());
+        std::copy(inliers.begin(), inliers.end(), mask.mutable_data());
+        return mask;
+    }
+}
+
+py::tuple findPlane3D(DoubleArray points_, DoubleArray probabilities_, int sampler, bool use_magsac_plus_plus,
+    double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
+{
+    std::vector<double> points = readRows(points_, 3, 3, "points");
+    std::vector<double> probabilities = readProbabilities(sampler, probabilities_);
+    std::vector<bool> inliers;
+    std::vector<double> plane;
+    const int num_inliers = findPlane3D_(points, inliers, plane, probabilities, sampler, use_magsac_plus_plus,
+        sigma_th, conf, min_iters, max_iters, partition_num);
+    return py::make_tuple(toArray(num_inliers, plane, { 4 }), toMask(inliers));
+}
+
 PYBIND11_PLUGIN(pymagsac) {
                                                                              
     py::module m("pymagsac", R"doc(
@@ -561,6 +612,18 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
         py::arg("partition_num") = 5); 
+
+  m.def("findPlane3D", &findPlane3D, R"doc(Fits a plane (a, b, c, d), with ax + by + cz + d = 0 and a unit normal (a, b, c), to points [n,3].
+Returns (plane, mask).)doc",
+        py::arg("points"),
+        py::arg("probabilities"),
+        py::arg("sampler") = 0,
+        py::arg("use_magsac_plus_plus") = true,
+        py::arg("sigma_th") = 1.0,
+        py::arg("conf") = 0.99,
+        py::arg("min_iters") = 50,
+        py::arg("max_iters") = 1000,
+        py::arg("partition_num") = 5);
 
 
   return m.ptr();
