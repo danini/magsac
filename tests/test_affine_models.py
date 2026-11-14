@@ -33,7 +33,8 @@ def test_homography_affine(use_magsac_plus_plus):
     x = np.array([[0, 0, 1], [640, 0, 1], [0, 480, 1], [640, 480, 1.0]])
     y, y_gt = x @ H.T, x @ H_gt.T
     error = np.linalg.norm(y[:, :2] / y[:, 2:] - y_gt[:, :2] / y_gt[:, 2:], axis=1).max()
-    assert error < 8.0, f"Corner transfer error {error:.2f} px"
+    # Largest error over 300 runs: 1.2 px with MAGSAC++, 4.3 px with MAGSAC.
+    assert error < (3.0 if use_magsac_plus_plus else 8.0), f"Corner transfer error {error:.2f} px"
     assert mask[:N_INLIERS].sum() > 0.9 * N_INLIERS, f"Only {mask[:N_INLIERS].sum()} inliers found"
     assert mask[N_INLIERS:].sum() < 0.1 * N_OUTLIERS, f"{mask[N_INLIERS:].sum()} outliers accepted"
 

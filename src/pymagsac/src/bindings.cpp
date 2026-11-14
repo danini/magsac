@@ -3,6 +3,7 @@
 #include <pybind11/stl_bind.h>
 #include <pybind11/numpy.h>
 #include "magsac_python.hpp"
+#include "bindings_utils.hpp"
 
 
 namespace py = pybind11;
@@ -469,17 +470,6 @@ py::tuple findHomography(
                          }
 namespace
 {
-    typedef py::array_t<double, py::array::c_style | py::array::forcecast> DoubleArray;
-
-    // Copies an array of dims [n, cols], n >= min_rows, to a row-major vector.
-    std::vector<double> readRows(const DoubleArray& array, py::ssize_t cols, py::ssize_t min_rows, const char* what)
-    {
-        if (array.ndim() != 2 || array.shape(1) != cols || array.shape(0) < min_rows)
-            throw std::invalid_argument(std::string(what) + " should be an array with dims [n," +
-                std::to_string(cols) + "], n>=" + std::to_string(min_rows));
-        return std::vector<double>(array.data(), array.data() + array.size());
-    }
-
     // Copies a 3x3 matrix to a row-major vector.
     std::vector<double> readMatrix3(const DoubleArray& array, const char* what)
     {
@@ -487,38 +477,13 @@ namespace
             throw std::invalid_argument(std::string(what) + " should be an array with dims [3,3]");
         return std::vector<double>(array.data(), array.data() + 9);
     }
-
-    // The inlier probabilities, used only by samplers 3 (NG-RANSAC) and 4 (AR-Sampler).
-    std::vector<double> readProbabilities(int sampler, const DoubleArray& probabilities)
-    {
-        if (sampler != 3 && sampler != 4)
-            return {};
-        return std::vector<double>(probabilities.data(), probabilities.data() + probabilities.size());
-    }
-
-    // The model as an array of the given shape, or None if no model was found.
-    py::object toArray(int num_inliers, const std::vector<double>& values, std::vector<py::ssize_t> shape)
-    {
-        if (num_inliers == 0)
-            return py::none();
-        DoubleArray array(shape);
-        std::copy(values.begin(), values.end(), array.mutable_data());
-        return std::move(array);
-    }
-
-    py::array_t<bool> toMask(const std::vector<bool>& inliers)
-    {
-        py::array_t<bool> mask(inliers.size());
-        std::copy(inliers.begin(), inliers.end(), mask.mutable_data());
-        return mask;
-    }
 }
 
 py::tuple findPnP(DoubleArray correspondences_, DoubleArray probabilities_, int sampler, bool use_magsac_plus_plus,
     double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
 {
     std::vector<double> correspondences = readRows(correspondences_, 5, 3, "correspondences");
-    std::vector<double> probabilities = readProbabilities(sampler, probabilities_);
+    std::vector<double> probabilities = readProbabilities(sampler, probabilities_, correspondences_.shape(0));
     std::vector<bool> inliers;
     std::vector<double> pose;
     const int num_inliers = findPnP_(correspondences, inliers, pose, probabilities, sampler, use_magsac_plus_plus,
@@ -530,7 +495,7 @@ py::tuple findRadialHomography(DoubleArray correspondences_, DoubleArray probabi
     double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
 {
     std::vector<double> correspondences = readRows(correspondences_, 4, 5, "correspondences");
-    std::vector<double> probabilities = readProbabilities(sampler, probabilities_);
+    std::vector<double> probabilities = readProbabilities(sampler, probabilities_, correspondences_.shape(0));
     std::vector<bool> inliers;
     std::vector<double> H, distortion;
     const int num_inliers = findRadialHomography_(correspondences, inliers, H, distortion, probabilities, sampler,
@@ -542,7 +507,7 @@ py::tuple findHomographyAffine(DoubleArray correspondences_, DoubleArray probabi
     double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
 {
     std::vector<double> correspondences = readRows(correspondences_, 8, 2, "correspondences");
-    std::vector<double> probabilities = readProbabilities(sampler, probabilities_);
+    std::vector<double> probabilities = readProbabilities(sampler, probabilities_, correspondences_.shape(0));
     std::vector<bool> inliers;
     std::vector<double> H;
     const int num_inliers = findHomographyAffine_(correspondences, inliers, H, probabilities, sampler,
@@ -555,7 +520,7 @@ py::tuple findEssentialMatrixPlanar(DoubleArray correspondences_, DoubleArray K1
 {
     std::vector<double> correspondences = readRows(correspondences_, 4, 2, "correspondences");
     std::vector<double> K1 = readMatrix3(K1_, "K1"), K2 = readMatrix3(K2_, "K2");
-    std::vector<double> probabilities = readProbabilities(sampler, probabilities_);
+    std::vector<double> probabilities = readProbabilities(sampler, probabilities_, correspondences_.shape(0));
     std::vector<bool> inliers;
     std::vector<double> E;
     const int num_inliers = findEssentialMatrixPlanar_(correspondences, inliers, E, K1, K2, probabilities, sampler,
@@ -570,7 +535,7 @@ py::tuple findEssentialMatrixGravity(DoubleArray correspondences_, DoubleArray K
     std::vector<double> correspondences = readRows(correspondences_, 4, 3, "correspondences");
     std::vector<double> K1 = readMatrix3(K1_, "K1"), K2 = readMatrix3(K2_, "K2");
     std::vector<double> gravity_src = readMatrix3(gravity_src_, "gravity_src"), gravity_dst = readMatrix3(gravity_dst_, "gravity_dst");
-    std::vector<double> probabilities = readProbabilities(sampler, probabilities_);
+    std::vector<double> probabilities = readProbabilities(sampler, probabilities_, correspondences_.shape(0));
     std::vector<bool> inliers;
     std::vector<double> E;
     const int num_inliers = findEssentialMatrixGravity_(correspondences, inliers, E, K1, K2, gravity_src, gravity_dst,
@@ -593,6 +558,95 @@ PYBIND11_PLUGIN(pymagsac) {
            adaptiveInlierSelection
     
     )doc");
+
+  m.def("findPnP", &findPnP, R"doc(Fits a camera pose [R | t] (3x4), x_camera = R x_world + t, to correspondences [n,5]: (u, v, x, y, z),
+where (u, v) are normalized image coordinates (K^-1 applied) and (x, y, z) the world point. Returns (pose, mask).
+The residual is the reprojection error in normalized coordinates, and sigma_th is in these units: a threshold of
+t pixels is t / f for a focal length of f pixels (the default, 0.01, is 10 px at f = 1000 px).
+Samplers: 0 (uniform), 1 (PROSAC, rows sorted by decreasing quality), 3 (NG-RANSAC) and 4 (AR-Sampler); 3 and 4 need
+probabilities, one per row (for 4, at least one positive). The mask marks the rows whose residual is at most sigma_th.)doc",
+        py::arg("correspondences"),
+        py::arg("probabilities"),
+        py::arg("sampler") = 0,
+        py::arg("use_magsac_plus_plus") = true,
+        py::arg("sigma_th") = 0.01,
+        py::arg("conf") = 0.99,
+        py::arg("min_iters") = 50,
+        py::arg("max_iters") = 1000,
+        py::arg("partition_num") = 5);
+
+  m.def("findRadialHomography", &findRadialHomography, R"doc(Fits a homography H and the radial distortion (lambda_1, lambda_2) of the division model
+in each image to correspondences [n,4]: (x1, y1, x2, y2), with coordinates relative to the distortion centres (for example,
+the image centres, divided by the image size). An undistorted point is (x, y, 1 + lambda * (x^2 + y^2)).
+Returns (H, distortion, mask). The residual is the mean of the forward and backward transfer errors between the undistorted
+points, in the units of the coordinates, as sigma_th: with coordinates divided by s pixels, a threshold of t pixels
+is t / s (the default, 0.01, is 10 px for s = 1000 px).
+Samplers: 0 (uniform), 1 (PROSAC, rows sorted by decreasing quality), 3 (NG-RANSAC) and 4 (AR-Sampler); 3 and 4 need
+probabilities, one per row (for 4, at least one positive). The mask marks the rows whose residual is at most sigma_th.)doc",
+        py::arg("correspondences"),
+        py::arg("probabilities"),
+        py::arg("sampler") = 0,
+        py::arg("use_magsac_plus_plus") = true,
+        py::arg("sigma_th") = 0.01,
+        py::arg("conf") = 0.99,
+        py::arg("min_iters") = 50,
+        py::arg("max_iters") = 1000,
+        py::arg("partition_num") = 5);
+
+  m.def("findHomographyAffine", &findHomographyAffine, R"doc(Fits a homography to affine correspondences [n,8]: (x1, y1, x2, y2, a11, a12, a21, a22),
+where A = [[a11, a12], [a21, a22]] maps a neighbourhood of (x1, y1) to one of (x2, y2). Returns (H, mask).
+Only the minimal solver (two affine correspondences) uses A: the residual is the transfer error of (x1, y1) in pixels,
+as sigma_th, and the final model is fitted to the inliers' points (four-point solver).
+Samplers: 0 (uniform), 1 (PROSAC, rows sorted by decreasing quality), 3 (NG-RANSAC) and 4 (AR-Sampler); 3 and 4 need
+probabilities, one per row (for 4, at least one positive). The mask marks the rows whose residual is at most sigma_th.)doc",
+        py::arg("correspondences"),
+        py::arg("probabilities"),
+        py::arg("sampler") = 0,
+        py::arg("use_magsac_plus_plus") = true,
+        py::arg("sigma_th") = 1.0,
+        py::arg("conf") = 0.99,
+        py::arg("min_iters") = 50,
+        py::arg("max_iters") = 1000,
+        py::arg("partition_num") = 5);
+
+  m.def("findEssentialMatrixPlanar", &findEssentialMatrixPlanar, R"doc(Fits an essential matrix assuming a planar motion (rotation about the camera's y axis,
+translation in its xz plane) to correspondences [n,4] in pixels, given the intrinsics K1 and K2. sigma_th is in pixels.
+Returns (E, mask). Only the minimal solver (two points) assumes the planar motion: the final model is refined by
+the bundle adjustment of a general essential matrix, so it satisfies the constraint only approximately.
+Samplers: 0 (uniform), 1 (PROSAC, rows sorted by decreasing quality), 3 (NG-RANSAC) and 4 (AR-Sampler); 3 and 4 need
+probabilities, one per row (for 4, at least one positive). The mask marks the rows whose residual is at most sigma_th.)doc",
+        py::arg("correspondences"),
+        py::arg("K1"),
+        py::arg("K2"),
+        py::arg("probabilities"),
+        py::arg("sampler") = 0,
+        py::arg("use_magsac_plus_plus") = true,
+        py::arg("sigma_th") = 1.0,
+        py::arg("conf") = 0.99,
+        py::arg("min_iters") = 50,
+        py::arg("max_iters") = 1000,
+        py::arg("partition_num") = 5);
+
+  m.def("findEssentialMatrixGravity", &findEssentialMatrixGravity, R"doc(Fits an essential matrix to correspondences [n,4] in pixels, given the intrinsics K1 and K2
+and the rotations gravity_src and gravity_dst that align each camera's y axis with gravity (so the remaining rotation is about
+the vertical axis). sigma_th is in pixels. Returns (E, mask). Only the minimal solver (three points) uses the gravity
+directions: the final model is refined by the bundle adjustment of a general essential matrix, so it satisfies the
+constraint only approximately.
+Samplers: 0 (uniform), 1 (PROSAC, rows sorted by decreasing quality), 3 (NG-RANSAC) and 4 (AR-Sampler); 3 and 4 need
+probabilities, one per row (for 4, at least one positive). The mask marks the rows whose residual is at most sigma_th.)doc",
+        py::arg("correspondences"),
+        py::arg("K1"),
+        py::arg("K2"),
+        py::arg("gravity_src"),
+        py::arg("gravity_dst"),
+        py::arg("probabilities"),
+        py::arg("sampler") = 0,
+        py::arg("use_magsac_plus_plus") = true,
+        py::arg("sigma_th") = 1.0,
+        py::arg("conf") = 0.99,
+        py::arg("min_iters") = 50,
+        py::arg("max_iters") = 1000,
+        py::arg("partition_num") = 5);
 
     m.def("adaptiveInlierSelection", &adaptiveInlierSelection, R"doc(some doc)doc",
         py::arg("x1y1"),
@@ -672,77 +726,6 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
         py::arg("partition_num") = 5); 
-
-  m.def("findPnP", &findPnP, R"doc(Fits a camera pose [R | t] (3x4), x_camera = R x_world + t, to correspondences [n,5]: (u, v, x, y, z),
-where (u, v) are normalized image coordinates (K^-1 applied) and (x, y, z) the world point. sigma_th is in normalized coordinates.
-Returns (pose, mask).)doc",
-        py::arg("correspondences"),
-        py::arg("probabilities"),
-        py::arg("sampler") = 0,
-        py::arg("use_magsac_plus_plus") = true,
-        py::arg("sigma_th") = 1.0,
-        py::arg("conf") = 0.99,
-        py::arg("min_iters") = 50,
-        py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5);
-
-  m.def("findRadialHomography", &findRadialHomography, R"doc(Fits a homography H and the radial distortion (lambda_1, lambda_2) of the division model
-in each image to correspondences [n,4]: (x1, y1, x2, y2), with coordinates relative to the distortion centres (for example,
-the image centres, scaled by the image size). An undistorted point is (x, y, 1 + lambda * (x^2 + y^2)).
-Returns (H, distortion, mask).)doc",
-        py::arg("correspondences"),
-        py::arg("probabilities"),
-        py::arg("sampler") = 0,
-        py::arg("use_magsac_plus_plus") = true,
-        py::arg("sigma_th") = 1.0,
-        py::arg("conf") = 0.99,
-        py::arg("min_iters") = 50,
-        py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5);
-
-  m.def("findHomographyAffine", &findHomographyAffine, R"doc(Fits a homography to affine correspondences [n,8]: (x1, y1, x2, y2, a11, a12, a21, a22),
-where A = [[a11, a12], [a21, a22]] maps a neighbourhood of (x1, y1) to one of (x2, y2). Returns (H, mask).)doc",
-        py::arg("correspondences"),
-        py::arg("probabilities"),
-        py::arg("sampler") = 0,
-        py::arg("use_magsac_plus_plus") = true,
-        py::arg("sigma_th") = 1.0,
-        py::arg("conf") = 0.99,
-        py::arg("min_iters") = 50,
-        py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5);
-
-  m.def("findEssentialMatrixPlanar", &findEssentialMatrixPlanar, R"doc(Fits an essential matrix assuming a planar motion (rotation about the camera's y axis,
-translation in its xz plane) to correspondences [n,4] in pixels, given the intrinsics K1 and K2. sigma_th is in pixels.
-Returns (E, mask).)doc",
-        py::arg("correspondences"),
-        py::arg("K1"),
-        py::arg("K2"),
-        py::arg("probabilities"),
-        py::arg("sampler") = 0,
-        py::arg("use_magsac_plus_plus") = true,
-        py::arg("sigma_th") = 1.0,
-        py::arg("conf") = 0.99,
-        py::arg("min_iters") = 50,
-        py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5);
-
-  m.def("findEssentialMatrixGravity", &findEssentialMatrixGravity, R"doc(Fits an essential matrix to correspondences [n,4] in pixels, given the intrinsics K1 and K2
-and the rotations gravity_src and gravity_dst that align each camera's y axis with gravity (so the remaining rotation is about
-the vertical axis). sigma_th is in pixels. Returns (E, mask).)doc",
-        py::arg("correspondences"),
-        py::arg("K1"),
-        py::arg("K2"),
-        py::arg("gravity_src"),
-        py::arg("gravity_dst"),
-        py::arg("probabilities"),
-        py::arg("sampler") = 0,
-        py::arg("use_magsac_plus_plus") = true,
-        py::arg("sigma_th") = 1.0,
-        py::arg("conf") = 0.99,
-        py::arg("min_iters") = 50,
-        py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5);
 
 
   return m.ptr();

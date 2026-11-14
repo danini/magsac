@@ -42,8 +42,8 @@ def test_radial_homography():
         corrs, probabilities=[], sigma_th=0.005, min_iters=500, max_iters=5000)
 
     assert H is not None, "No model found"
-    np.testing.assert_allclose(distortion, [lam1, lam2], atol=0.08)
-    np.testing.assert_allclose(H / H[2, 2], H_gt, atol=0.02)
+    np.testing.assert_allclose(distortion, [lam1, lam2], atol=0.04)
+    np.testing.assert_allclose(H / H[2, 2], H_gt, atol=0.003)
     assert mask[:N_INLIERS].sum() > 0.9 * N_INLIERS, f"Only {mask[:N_INLIERS].sum()} inliers found"
     assert mask[N_INLIERS:].sum() < 0.1 * N_OUTLIERS, f"{mask[N_INLIERS:].sum()} outliers accepted"
 

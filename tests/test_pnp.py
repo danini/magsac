@@ -54,16 +54,26 @@ def rotation_error(R1, R2):
     return np.degrees(np.arccos(cos_angle))
 
 
+def check_pose(pose, mask, R_gt, t_gt, n_inliers, max_rotation_error, max_translation_error):
+    assert pose is not None, "PnP failed"
+    err_R = rotation_error(R_gt, pose[:3, :3])
+    err_t = np.linalg.norm(t_gt - pose[:3, 3])
+    assert err_R < max_rotation_error, f"Rotation error {err_R:.4f} degrees"
+    assert err_t < max_translation_error, f"Translation error {err_t:.5f}"
+    assert mask[:n_inliers].sum() >= 0.95 * n_inliers, f"Only {mask[:n_inliers].sum()} inliers found"
+    assert mask[n_inliers:].sum() <= 2, f"{mask[n_inliers:].sum()} outliers accepted"
+
+
 @pytest.mark.parametrize("use_magsac_plus_plus", [True, False])
 def test_pnp_basic(use_magsac_plus_plus):
-    """Test PnP with a simple camera pose."""
+    """Test PnP with a simple camera pose (noise of 0.5 px at a focal length of 1000 px)."""
     R_gt = rotation_matrix([0, 1, 0], 15)
     t_gt = np.array([0.5, -0.3, 0.1])
 
     corrs = generate_pnp_data(R_gt, t_gt, n_inliers=150, n_outliers=50)
 
     pose, mask = pymagsac.findPnP(
-        np.ascontiguousarray(corrs),
+        corrs,
         probabilities=[],
         sampler=0,
         use_magsac_plus_plus=use_magsac_plus_plus,
@@ -72,20 +82,11 @@ def test_pnp_basic(use_magsac_plus_plus):
         min_iters=100,
         max_iters=5000,
     )
-
-    assert pose is not None, "PnP failed"
-
-    R_est = pose[:3, :3]
-    t_est = pose[:3, 3]
-
-    err_R = rotation_error(R_gt, R_est)
-    err_t = np.linalg.norm(t_gt - t_est)
-
-    assert err_R < 5.0, f"Rotation error {err_R:.2f} degrees"
-    assert err_t < 0.5, f"Translation error {err_t:.3f}"
+    check_pose(pose, mask, R_gt, t_gt, 150, max_rotation_error=0.15, max_translation_error=0.02)
 
 
-def test_pnp_identity_pose():
+@pytest.mark.parametrize("use_magsac_plus_plus", [True, False])
+def test_pnp_identity_pose(use_magsac_plus_plus):
     """Test PnP with near-identity rotation and small translation."""
     R_gt = rotation_matrix([1, 0, 0], 2)  # 2 degree rotation
     t_gt = np.array([0.01, 0.02, 0.0])
@@ -93,21 +94,39 @@ def test_pnp_identity_pose():
     corrs = generate_pnp_data(R_gt, t_gt, n_inliers=200, n_outliers=50, noise_std=0.1)
 
     pose, mask = pymagsac.findPnP(
-        np.ascontiguousarray(corrs),
+        corrs,
         probabilities=[],
+        use_magsac_plus_plus=use_magsac_plus_plus,
         sigma_th=0.005,
+        min_iters=100,
         max_iters=5000,
     )
+    check_pose(pose, mask, R_gt, t_gt, 200, max_rotation_error=0.2, max_translation_error=0.02)
 
-    assert pose is not None, "PnP failed"
-    R_est = pose[:3, :3]
-    err_R = rotation_error(R_gt, R_est)
-    assert err_R < 3.0, f"Rotation error {err_R:.2f} degrees"
+
+@pytest.mark.parametrize("sampler", [1, 3, 4])
+def test_pnp_samplers(sampler):
+    """PROSAC (rows sorted by quality), NG-RANSAC and AR-Sampler, with one probability per row."""
+    R_gt = rotation_matrix([0, 1, 0], 15)
+    t_gt = np.array([0.5, -0.3, 0.1])
+    corrs = generate_pnp_data(R_gt, t_gt, n_inliers=150, n_outliers=50)
+    probabilities = np.r_[np.full(150, 0.9), np.full(50, 0.1)]
+    pose, mask = pymagsac.findPnP(corrs, probabilities, sampler=sampler, sigma_th=0.01, min_iters=100, max_iters=5000)
+    check_pose(pose, mask, R_gt, t_gt, 150, max_rotation_error=0.15, max_translation_error=0.02)
 
 
 def test_pnp_insufficient_points():
     """Test that PnP raises with fewer than 3 points."""
     corrs = np.array([[0.0, 0.0, 1.0, 0.0, 5.0],
                       [0.1, 0.0, 0.0, 1.0, 5.0]])
-    with pytest.raises(Exception):
-        pymagsac.findPnP(np.ascontiguousarray(corrs), probabilities=[])
+    with pytest.raises(ValueError):
+        pymagsac.findPnP(corrs, probabilities=[])
+
+
+@pytest.mark.parametrize("sampler, probabilities", [
+    (3, []), (4, []), (3, [0.5] * 10), (4, np.zeros(20))])
+def test_pnp_invalid_probabilities(sampler, probabilities):
+    """Samplers 3 and 4 need one probability per row (and, for 4, a positive one)."""
+    corrs = np.random.default_rng(0).uniform(-1, 1, (20, 5))
+    with pytest.raises(ValueError):
+        pymagsac.findPnP(corrs, probabilities, sampler=sampler)

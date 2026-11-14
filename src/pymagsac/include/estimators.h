@@ -16,6 +16,7 @@
 #include "estimators/solver_essential_matrix_two_points_planar.h"
 #include "estimators/solver_essential_matrix_three_points_gravity.h"
 #include "model.h"
+#include "estimator_wrapper.h"
 
 namespace magsac
 {
@@ -663,36 +664,6 @@ namespace magsac
 				return 1.0 / (4.0 * getGammaFunction());
 			}
 		};
-
-		// Adds what MAGSAC needs to a graph-cut-ransac estimator: the residual used for scoring
-		// and the constants of the chi-square distribution, which are those of the estimators above
-		// (4 degrees of freedom). _NormalizesForNonMinimalFitting tells whether the estimator's
-		// non-minimal fit copies the points it uses (so it reads one weight per used point) or
-		// reads them from the full data (one weight per data point).
-		template<class _Estimator, bool _NormalizesForNonMinimalFitting>
-		class Wrapper : public _Estimator
-		{
-		public:
-			using _Estimator::_Estimator;
-			using _Estimator::residual;
-
-			inline double residualForScoring(const cv::Mat& point_,
-				const gcransac::Model& model_) const
-			{
-				return residual(point_, model_.descriptor);
-			}
-
-			static constexpr double getSigmaQuantile() { return 3.64; }
-			static constexpr size_t getDegreesOfFreedom() { return 4; }
-			static constexpr double getC() { return 0.25; }
-			static constexpr double getGammaFunction() { return 1.0; }
-			static constexpr bool doesNormalizationForNonMinimalFitting() { return _NormalizesForNonMinimalFitting; }
-			// The upper incomplete gamma value of (DoF - 1) / 2 with k^2 / 2.
-			static constexpr double getUpperIncompleteGammaOfK() { return 0.0036572608340910764; }
-			// The lower incomplete gamma value of (DoF + 1) / 2 with k^2 / 2.
-			static constexpr double getLowerIncompleteGammaOfK() { return 1.3012265540498875; }
-			static constexpr double getChiSquareParamCp() { return 1.0 / (4.0 * getGammaFunction()); }
-		};
 	}
 
 	namespace utils
@@ -712,17 +683,9 @@ namespace magsac
 			gcransac::estimator::solver::HomographyFourPointSolver> // The solver used for fitting a model to a non-minimal sample
 			DefaultHomographyEstimator;
 
-		// The default estimator for rigid transformation fitting
-		typedef estimator::RigidTransformationEstimator<gcransac::estimator::solver::RigidTransformationSVDBasedSolver, // The solver used for fitting a model to a minimal sample
-			gcransac::estimator::solver::RigidTransformationSVDBasedSolver> // The solver used for fitting a model to a non-minimal sample
-			DefaultRigidTransformationEstimator;
-
-		// The default estimator for 2D line fitting
-		typedef estimator::Line2DEstimator<gcransac::estimator::solver::LinearModelSolver<2>, // The solver used for fitting a model to a minimal sample
-			gcransac::estimator::solver::LinearModelSolver<2>>  // The solver used for fitting a model to a non-minimal sample
-			Default2DLineEstimator;
-
-		// The default estimator for absolute pose (PnP) fitting
+		// The default estimator for absolute pose (PnP) fitting. On a non-minimal sample, PnPBundleAdjustment
+		// fits EPnP (OpenCV's solvePnP, unweighted), then calls pose_lib::refine_pnp, which at the
+		// graph-cut-ransac commit used here returns without refining (-1).
 		typedef estimator::Wrapper<gcransac::estimator::PerspectiveNPointEstimator<gcransac::estimator::solver::P3PSolver, // The solver used for fitting a model to a minimal sample
 			gcransac::estimator::solver::PnPBundleAdjustment>, false> // The solver used for fitting a model to a non-minimal sample
 			DefaultPnPEstimator;
@@ -746,5 +709,15 @@ namespace magsac
 		typedef estimator::EssentialMatrixEstimator<gcransac::estimator::solver::EssentialMatrixThreePointsGravity, // The solver used for fitting a model to a minimal sample
 			gcransac::estimator::solver::EssentialMatrixBundleAdjustmentSolver> // The solver used for fitting a model to a non-minimal sample
 			DefaultGravityEssentialMatrixEstimator;
+
+		// The default estimator for rigid transformation fitting
+		typedef estimator::RigidTransformationEstimator<gcransac::estimator::solver::RigidTransformationSVDBasedSolver, // The solver used for fitting a model to a minimal sample
+			gcransac::estimator::solver::RigidTransformationSVDBasedSolver> // The solver used for fitting a model to a non-minimal sample
+			DefaultRigidTransformationEstimator;
+
+		// The default estimator for 2D line fitting
+		typedef estimator::Line2DEstimator<gcransac::estimator::solver::LinearModelSolver<2>, // The solver used for fitting a model to a minimal sample
+			gcransac::estimator::solver::LinearModelSolver<2>>  // The solver used for fitting a model to a non-minimal sample
+			Default2DLineEstimator;
 	}
 }
