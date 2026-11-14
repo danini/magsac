@@ -3,120 +3,74 @@ import pymagsac
 import numpy as np
 import pytest
 
-
-def generate_essential_data(R_gt, t_gt, K, n_inliers=100, n_outliers=30, seed=42):
-    """Generate 2D-2D correspondences from a known relative pose.
-
-    Returns (N, 4) array: [x1, y1, x2, y2] in pixel coordinates.
-    """
-    rng = np.random.default_rng(seed)
-
-    # Random 3D points in front of both cameras
-    points_3d = rng.uniform(-3, 3, (n_inliers, 3))
-    points_3d[:, 2] = np.abs(points_3d[:, 2]) + 3  # Ensure positive depth
-
-    # Project into camera 1 (identity pose)
-    proj1 = (K @ points_3d.T).T
-    img1 = proj1[:, :2] / proj1[:, 2:3]
-
-    # Project into camera 2 (R, t)
-    points_cam2 = (R_gt @ points_3d.T).T + t_gt
-    proj2 = (K @ points_cam2.T).T
-    img2 = proj2[:, :2] / proj2[:, 2:3]
-
-    # Add small noise
-    img1 += rng.normal(0, 0.5, img1.shape)
-    img2 += rng.normal(0, 0.5, img2.shape)
-
-    inliers = np.hstack([img1, img2])
-
-    # Outliers
-    outliers = np.hstack([
-        rng.uniform(0, 640, (n_outliers, 2)),
-        rng.uniform(0, 640, (n_outliers, 2))
-    ])
-
-    return np.vstack([inliers, outliers])
+K = np.array([[500.0, 0, 320], [0, 500, 240], [0, 0, 1]])
+N_INLIERS, N_OUTLIERS = 200, 100
 
 
 def rotation_matrix(axis, angle_deg):
     angle = np.radians(angle_deg)
-    axis = np.array(axis, dtype=float)
-    axis /= np.linalg.norm(axis)
-    K = np.array([[0, -axis[2], axis[1]], [axis[2], 0, -axis[0]], [-axis[1], axis[0], 0]])
-    return np.eye(3) + np.sin(angle) * K + (1 - np.cos(angle)) * K @ K
+    axis = np.asarray(axis, dtype=float) / np.linalg.norm(axis)
+    S = np.array([[0, -axis[2], axis[1]], [axis[2], 0, -axis[0]], [-axis[1], axis[0], 0]])
+    return np.eye(3) + np.sin(angle) * S + (1 - np.cos(angle)) * S @ S
+
+
+def skew(t):
+    return np.array([[0, -t[2], t[1]], [t[2], 0, -t[0]], [-t[1], t[0], 0]])
+
+
+def generate_correspondences(R, t, seed=42):
+    """Pixel correspondences [x1, y1, x2, y2] of points seen by cameras [I | 0] and [R | t],
+    with 0.5 px noise, followed by uniformly random outliers."""
+    rng = np.random.default_rng(seed)
+    X = rng.uniform(-3, 3, (N_INLIERS, 3))
+    X[:, 2] = np.abs(X[:, 2]) + 4
+    x1 = X @ K.T
+    x2 = (X @ R.T + t) @ K.T
+    inliers = np.hstack([x1[:, :2] / x1[:, 2:], x2[:, :2] / x2[:, 2:]])
+    inliers += rng.normal(0, 0.5, inliers.shape)
+    outliers = rng.uniform(0, 640, (N_OUTLIERS, 4))
+    return np.vstack([inliers, outliers])
+
+
+def check(E, mask, R, t):
+    assert E is not None, "No essential matrix found"
+    E_gt = skew(t) @ R
+    E, E_gt = E / np.linalg.norm(E), E_gt / np.linalg.norm(E_gt)
+    error = min(np.linalg.norm(E - E_gt), np.linalg.norm(E + E_gt))
+    assert error < 0.2, f"Essential matrix error {error:.3f}"
+    assert mask[:N_INLIERS].sum() > 0.9 * N_INLIERS, f"Only {mask[:N_INLIERS].sum()} inliers found"
+    assert mask[N_INLIERS:].sum() < 0.1 * N_OUTLIERS, f"{mask[N_INLIERS:].sum()} outliers accepted"
 
 
 @pytest.mark.parametrize("use_magsac_plus_plus", [True, False])
-def test_essential_planar_basic(use_magsac_plus_plus):
-    """Test planar essential matrix estimation (2-point, planar motion)."""
-    # Planar motion: rotation around Y axis only, translation in XZ plane
-    R_gt = rotation_matrix([0, 1, 0], 5)
-    t_gt = np.array([0.5, 0.0, 0.1])
-    K = np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=float)
-
-    corrs = generate_essential_data(R_gt, t_gt, K, n_inliers=200, n_outliers=50)
-
+def test_essential_planar(use_magsac_plus_plus):
+    """Planar motion: rotation about the y axis, translation in the xz plane."""
+    R, t = rotation_matrix([0, 1, 0], 5), np.array([0.5, 0.0, 0.1])
     E, mask = pymagsac.findEssentialMatrixPlanar(
-        np.ascontiguousarray(corrs),
-        K1=K, K2=K,
-        probabilities=[],
-        sampler=0,
-        use_magsac_plus_plus=use_magsac_plus_plus,
-        sigma_th=2.0,
-        max_iters=5000,
-    )
-
-    assert E is not None, "Planar essential matrix estimation failed"
-    n_inliers_found = np.sum(mask)
-    assert n_inliers_found > 100, f"Only {n_inliers_found} inliers found"
+        generate_correspondences(R, t), K1=K, K2=K, probabilities=[],
+        use_magsac_plus_plus=use_magsac_plus_plus, sigma_th=2.0, min_iters=500, max_iters=5000)
+    check(E, mask, R, t)
 
 
 def test_essential_planar_insufficient_points():
-    """Test that planar essential matrix raises with fewer than 2 points."""
-    K = np.eye(3)
-    corrs = np.random.rand(1, 4)
-    with pytest.raises(Exception):
-        pymagsac.findEssentialMatrixPlanar(np.ascontiguousarray(corrs), K1=K, K2=K, probabilities=[])
+    with pytest.raises(ValueError):
+        pymagsac.findEssentialMatrixPlanar(np.random.rand(1, 4), K1=K, K2=K, probabilities=[])
 
 
 @pytest.mark.parametrize("use_magsac_plus_plus", [True, False])
-def test_essential_gravity_basic(use_magsac_plus_plus):
-    """Test gravity-assisted essential matrix estimation (3-point)."""
-    # General motion with known gravity direction
-    R_gt = rotation_matrix([0.1, 1, 0.2], 10)
-    t_gt = np.array([0.3, -0.1, 0.5])
-    K = np.array([[500, 0, 320], [0, 500, 240], [0, 0, 1]], dtype=float)
-
-    corrs = generate_essential_data(R_gt, t_gt, K, n_inliers=200, n_outliers=50)
-
-    # Gravity rotation matrices (align gravity to Y axis)
-    # In practice these come from IMU; here we use identity (gravity already aligned)
-    gravity_src = np.eye(3)
-    gravity_dst = np.eye(3)
-
+def test_essential_gravity(use_magsac_plus_plus):
+    """Cameras tilted by known rotations; once these are undone, the rotation is about the y axis."""
+    G1, G2 = rotation_matrix([1, 0, 0.3], 8), rotation_matrix([0.2, 0, 1], -6)
+    R = G2.T @ rotation_matrix([0, 1, 0], 10) @ G1
+    t = np.array([0.3, -0.1, 0.5])
     E, mask = pymagsac.findEssentialMatrixGravity(
-        np.ascontiguousarray(corrs),
-        K1=K, K2=K,
-        gravity_src=gravity_src,
-        gravity_dst=gravity_dst,
-        probabilities=[],
-        sampler=0,
-        use_magsac_plus_plus=use_magsac_plus_plus,
-        sigma_th=2.0,
-        max_iters=5000,
-    )
-
-    assert E is not None, "Gravity essential matrix estimation failed"
-    n_inliers_found = np.sum(mask)
-    assert n_inliers_found > 50, f"Only {n_inliers_found} inliers found"
+        generate_correspondences(R, t), K1=K, K2=K, gravity_src=G1, gravity_dst=G2,
+        probabilities=[], use_magsac_plus_plus=use_magsac_plus_plus, sigma_th=2.0, min_iters=500, max_iters=5000)
+    check(E, mask, R, t)
 
 
 def test_essential_gravity_insufficient_points():
-    """Test that gravity essential matrix raises with fewer than 3 points."""
-    K = np.eye(3)
     G = np.eye(3)
-    corrs = np.random.rand(2, 4)
-    with pytest.raises(Exception):
-        pymagsac.findEssentialMatrixGravity(np.ascontiguousarray(corrs), K1=K, K2=K,
+    with pytest.raises(ValueError):
+        pymagsac.findEssentialMatrixGravity(np.random.rand(2, 4), K1=K, K2=K,
                                             gravity_src=G, gravity_dst=G, probabilities=[])
