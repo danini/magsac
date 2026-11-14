@@ -74,13 +74,13 @@ pip3 install -e .
 
 # Reproducible results
 
-The Python estimators (`findHomography`, `findFundamentalMatrix`, `findEssentialMatrix`, `findRigidTransformation`, `findLine2D`) draw random samples. To get the same result every time, pass a seed, a non-negative integer:
+The Python estimators (`findHomography`, `findFundamentalMatrix`, `findEssentialMatrix`, `findRigidTransformation`, `findLine2D`) draw random samples. To get the same result every time, pass a seed, an integer from 0 to 2^32 - 1:
 
 ```python
 H, mask = pymagsac.findHomography(correspondences, w1, h1, w2, h2, probabilities, seed=42)
 ```
 
-The same seed, data and parameters give the same result on the same platform (the random distributions of the C++ standard library differ between compilers). Without a seed (`seed=None`, the default), the samplers are seeded from `std::random_device`, as before. A seed also calls `std::srand`, which is shared by the whole process.
+The same seed, data and parameters give the same result on the same platform (the random distributions of the C++ standard library differ between compilers). Without a seed (`seed=None`, the default), nothing changes: the uniform, PROSAC, P-NAPSAC and importance samplers are seeded from `std::random_device`, and the AR-Sampler draws from `std::rand`. A seed seeds both, with `std::srand`, whose state is shared with the rest of the program.
 
 # Example project
 

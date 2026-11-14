@@ -14,10 +14,10 @@ def project(P, X):
     return x[:, :2] / x[:, 2:]
 
 
-def with_outliers(points, low, high):
-    """Replaces the first 60% of the points by uniform outliers."""
+def with_outliers(points, low, high, ratio=0.6):
+    """Replaces the first points (the given ratio of them) by uniform outliers."""
     points = points.copy()
-    n = int(0.6 * len(points))
+    n = int(ratio * len(points))
     points[:n] = RNG.uniform(low, high, size=(n, points.shape[1]))
     return points
 
@@ -32,7 +32,8 @@ T = np.array([1.0, 0.1, 0.0])
 TWO_VIEW = with_outliers(
     np.c_[project(K @ np.eye(3, 4), X), project(K @ np.c_[R, T], X) + RNG.normal(0, 1, (N, 2))],
     0, 640)
-RIGID = with_outliers(np.c_[X, X @ R.T + T + RNG.normal(0, 0.01, (N, 3))], -3, 9)
+# Fewer outliers: with 60%, 5 iterations rarely find a rigid transformation
+RIGID = with_outliers(np.c_[X, X @ R.T + T + RNG.normal(0, 0.01, (N, 3))], -3, 9, ratio=0.3)
 
 # Few iterations, so that different samples give different results
 ITERS = dict(min_iters=5, max_iters=5)
