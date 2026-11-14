@@ -27,15 +27,14 @@ import argparse
 import csv
 import time
 import numpy as np
-import pymagsac
 
 import datasets
 import synthetic as syn
 
-# task -> (estimator, generator, residual)
+# task -> (pymagsac's estimator, generator, residual)
 TASKS = {
-    "fundamental": (pymagsac.findFundamentalMatrix, syn.gen_fundamental, syn.sampson),
-    "homography": (pymagsac.findHomography, syn.gen_homography, syn.transfer),
+    "fundamental": ("findFundamentalMatrix", syn.gen_fundamental, syn.sampson),
+    "homography": ("findHomography", syn.gen_homography, syn.transfer),
 }
 # Maximum sigma used for the scenes of data/ by examples/cpp_example.cpp.
 REAL_SIGMA = {"fundamental": 5.0, "homography": 50.0}
@@ -44,12 +43,14 @@ METRICS = ["err", "gt_err", "F1", "fail", "time_ms"]
 
 def estimate(task, data, args, sigma):
     """Runs pymagsac; returns (3x3 model or None, inlier mask, time in ms)."""
+    import pymagsac  # here, so that --compare works without pymagsac
+    estimator = getattr(pymagsac, TASKS[task][0])
     options = dict(sampler=args.sampler, use_magsac_plus_plus=not args.magsac,
                    sigma_th=sigma, conf=0.99, min_iters=50, max_iters=args.max_iters)
     # Image sizes are only used by the P-NAPSAC and AR samplers' grids.
     size = np.ceil(data.max(axis=0)) + 1
     start = time.perf_counter()
-    model, mask = TASKS[task][0](data, *size, np.array([]), **options)
+    model, mask = estimator(data, *size, np.array([]), **options)
     ms = (time.perf_counter() - start) * 1e3
     return model, mask, ms
 
