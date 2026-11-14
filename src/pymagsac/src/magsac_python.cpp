@@ -455,8 +455,22 @@ int findEssentialMatrix_(std::vector<double>& correspondences,
 			models,
 			&weights[0]))
         {
-            // Return the refined model, and its inliers
-            model.descriptor = models[0].descriptor;
+            // Return the refined model, and its inliers. The bundle adjustment returns one model
+            // per pose of the essential matrix that passes its cheirality check: if it returns
+            // more than one, keep the one with the most inliers.
+            int best_inlier_number = -1;
+            for (const auto &refined_model : models)
+            {
+                int inlier_number = 0;
+                for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx)
+                    inlier_number +=
+                        estimator.residual(normalized_points.row(pt_idx), refined_model.descriptor) <= normalized_sigma_max;
+                if (inlier_number > best_inlier_number)
+                {
+                    best_inlier_number = inlier_number;
+                    model.descriptor = refined_model.descriptor;
+                }
+            }
             num_inliers = 0;
             for (auto pt_idx = 0; pt_idx < points.rows; ++pt_idx) {
                 const int is_inlier =
