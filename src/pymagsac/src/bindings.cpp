@@ -80,6 +80,13 @@ py::tuple adaptiveInlierSelection(
 
 }
 
+// The importance sampler (3) and the AR-Sampler (4) read one probability per point
+void checkProbabilities(const std::vector<double>& probabilities, size_t point_number)
+{
+    if (probabilities.size() != point_number)
+        throw std::invalid_argument("Samplers 3 and 4 need one probability per point");
+}
+
 py::tuple findRigidTransformation(
 	py::array_t<double>  correspondences_,
 	py::array_t<double>  probabilities_,
@@ -115,6 +122,7 @@ py::tuple findRigidTransformation(
         py::buffer_info buf_prob = probabilities_.request();
         double* ptr_prob = (double*)buf_prob.ptr;
         probabilities.assign(ptr_prob, ptr_prob + buf_prob.size);        
+        checkProbabilities(probabilities, NUM_TENTS);
     }
 
     int num_inl = findRigidTransformation_(
@@ -185,6 +193,7 @@ py::tuple findFundamentalMatrix(
         py::buffer_info buf_prob = probabilities_.request();
         double* ptr_prob = (double*)buf_prob.ptr;
         probabilities.assign(ptr_prob, ptr_prob + buf_prob.size);        
+        checkProbabilities(probabilities, NUM_TENTS);
     }
 
     int num_inl = findFundamentalMatrix_(
@@ -283,6 +292,7 @@ py::tuple findEssentialMatrix(
         py::buffer_info buf_prob = probabilities_.request();
         double* ptr_prob = (double*)buf_prob.ptr;
         probabilities.assign(ptr_prob, ptr_prob + buf_prob.size);        
+        checkProbabilities(probabilities, NUM_TENTS);
     }
 
     int num_inl = findEssentialMatrix_(
@@ -357,6 +367,7 @@ py::tuple findLine2D(
         py::buffer_info buf_prob = probabilities_.request();
         double* ptr_prob = (double*)buf_prob.ptr;
         probabilities.assign(ptr_prob, ptr_prob + buf_prob.size);        
+        checkProbabilities(probabilities, NUM_TENTS);
     }
     
     int num_inl = findLine2D_(
@@ -431,6 +442,7 @@ py::tuple findHomography(
         py::buffer_info buf_prob = probabilities_.request();
         double* ptr_prob = (double*)buf_prob.ptr;
         probabilities.assign(ptr_prob, ptr_prob + buf_prob.size);        
+        checkProbabilities(probabilities, NUM_TENTS);
     }
     
     int num_inl = findHomography_(
