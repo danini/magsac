@@ -610,9 +610,10 @@ probabilities, one per row (for 4, at least one positive). The mask marks the ro
         py::arg("partition_num") = 5);
 
   m.def("findEssentialMatrixPlanar", &findEssentialMatrixPlanar, R"doc(Fits an essential matrix assuming a planar motion (rotation about the camera's y axis,
-translation in its xz plane) to correspondences [n,4] in pixels, given the intrinsics K1 and K2. sigma_th is in pixels.
-Returns (E, mask). Only the minimal solver (two points) assumes the planar motion: the final model is refined by
-the bundle adjustment of a general essential matrix, so it satisfies the constraint only approximately.
+translation in its xz plane) to correspondences [n,4] in pixels, given the intrinsics K1 and K2.
+Returns (E, mask). Only the minimal solver (two points) assumes the planar motion: the final model is a general essential
+matrix fitted to the inliers (five-point solver, then bundle adjustment), so it satisfies the constraint only approximately.
+The residual is the Sampson distance, in pixels (converted by the mean focal length), as sigma_th.
 Samplers: 0 (uniform), 1 (PROSAC, rows sorted by decreasing quality), 3 (NG-RANSAC) and 4 (AR-Sampler); 3 and 4 need
 probabilities, one per row (for 4, at least one positive). The mask marks the rows whose residual is at most sigma_th.)doc",
         py::arg("correspondences"),
@@ -629,9 +630,9 @@ probabilities, one per row (for 4, at least one positive). The mask marks the ro
 
   m.def("findEssentialMatrixGravity", &findEssentialMatrixGravity, R"doc(Fits an essential matrix to correspondences [n,4] in pixels, given the intrinsics K1 and K2
 and the rotations gravity_src and gravity_dst that align each camera's y axis with gravity (so the remaining rotation is about
-the vertical axis). sigma_th is in pixels. Returns (E, mask). Only the minimal solver (three points) uses the gravity
-directions: the final model is refined by the bundle adjustment of a general essential matrix, so it satisfies the
-constraint only approximately.
+the vertical axis). Returns (E, mask). Only the minimal solver (three points) uses the gravity directions: the final model
+is a general essential matrix fitted to the inliers (five-point solver, then bundle adjustment), so it satisfies the
+constraint only approximately. The residual is the Sampson distance, in pixels (converted by the mean focal length), as sigma_th.
 Samplers: 0 (uniform), 1 (PROSAC, rows sorted by decreasing quality), 3 (NG-RANSAC) and 4 (AR-Sampler); 3 and 4 need
 probabilities, one per row (for 4, at least one positive). The mask marks the rows whose residual is at most sigma_th.)doc",
         py::arg("correspondences"),
