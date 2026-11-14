@@ -1,6 +1,11 @@
+#include <optional>
 #include <string>
 #include <vector>
 #include <opencv2/core/core.hpp>
+
+// Seeds the random generators of the next estimation, or, without a seed,
+// restores the default seeding from std::random_device.
+void applyMagsacSeed(std::optional<unsigned int> seed);
 
 int adaptiveInlierSelection_(
     const std::vector<double>& srcPts_,

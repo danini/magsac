@@ -20,6 +20,22 @@
 
 #include <gflags/gflags.h>
 
+#include <cstdlib>
+
+// The samplers seed their generators (UniformRandomGenerator) when they are
+// built, and the AR-Sampler draws from std::rand: with a seed, both are seeded
+// from it. std::rand is process-wide and std::srand can't be undone.
+void applyMagsacSeed(std::optional<unsigned int> seed)
+{
+    if (seed)
+    {
+        gcransac::utils::UniformRandomGenerator<size_t>::setGlobalSeed(*seed);
+        std::srand(*seed);
+    }
+    else
+        gcransac::utils::UniformRandomGenerator<size_t>::clearGlobalSeed();
+}
+
 int findRigidTransformation_(
     std::vector<double>& correspondences,
     std::vector<bool>& inliers,
