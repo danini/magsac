@@ -392,404 +392,6 @@ py::tuple findLine2D(
     return py::make_tuple(line_, inliers_);
 }
 
-py::tuple findPlane3D(
-    py::array_t<double> points_,
-    py::array_t<double> probabilities_,
-    int sampler,
-    bool use_magsac_plus_plus,
-    double sigma_th,
-    double conf,
-    int min_iters,
-    int max_iters,
-    int partition_num)
-{
-    py::buffer_info buf1 = points_.request();
-    size_t NUM_TENTS = buf1.shape[0];
-    size_t DIM = buf1.shape[1];
-
-    if (DIM != 3)
-        throw std::invalid_argument("points should be an array with dims [n,3], n>=3");
-    if (NUM_TENTS < 3)
-        throw std::invalid_argument("points should be an array with dims [n,3], n>=3");
-
-    double* ptr1 = (double*)buf1.ptr;
-    std::vector<double> points;
-    points.assign(ptr1, ptr1 + buf1.size);
-
-    std::vector<double> plane(4);
-    std::vector<bool> inliers(NUM_TENTS);
-
-    std::vector<double> probabilities;
-    if (sampler == 3 || sampler == 4)
-    {
-        py::buffer_info buf_prob = probabilities_.request();
-        double* ptr_prob = (double*)buf_prob.ptr;
-        probabilities.assign(ptr_prob, ptr_prob + buf_prob.size);
-    }
-
-    int num_inl = findPlane3D_(
-        points,
-        inliers,
-        plane,
-        probabilities,
-        sampler,
-        use_magsac_plus_plus,
-        sigma_th,
-        conf,
-        min_iters,
-        max_iters,
-        partition_num);
-
-    py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
-    py::buffer_info buf3 = inliers_.request();
-    bool* ptr3 = (bool*)buf3.ptr;
-    for (size_t i = 0; i < NUM_TENTS; i++)
-        ptr3[i] = inliers[i];
-
-    if (num_inl == 0) {
-        return py::make_tuple(pybind11::cast<pybind11::none>(Py_None), inliers_);
-    }
-    py::array_t<double> plane_ = py::array_t<double>({4});
-    py::buffer_info buf2 = plane_.request();
-    double* ptr2 = (double*)buf2.ptr;
-    for (size_t i = 0; i < 4; i++)
-        ptr2[i] = plane[i];
-
-    return py::make_tuple(plane_, inliers_);
-}
-
-py::tuple findPnP(
-    py::array_t<double> correspondences_,
-    py::array_t<double> probabilities_,
-    int sampler,
-    bool use_magsac_plus_plus,
-    double sigma_th,
-    double conf,
-    int min_iters,
-    int max_iters,
-    int partition_num)
-{
-    py::buffer_info buf1 = correspondences_.request();
-    size_t NUM_TENTS = buf1.shape[0];
-    size_t DIM = buf1.shape[1];
-
-    if (DIM != 5)
-        throw std::invalid_argument("correspondences should be [n,5] (u,v,x,y,z), n>=3");
-    if (NUM_TENTS < 3)
-        throw std::invalid_argument("correspondences should be [n,5] (u,v,x,y,z), n>=3");
-
-    double* ptr1 = (double*)buf1.ptr;
-    std::vector<double> correspondences;
-    correspondences.assign(ptr1, ptr1 + buf1.size);
-
-    std::vector<double> pose(12);
-    std::vector<bool> inliers(NUM_TENTS);
-
-    std::vector<double> probabilities;
-    if (sampler == 3 || sampler == 4)
-    {
-        py::buffer_info buf_prob = probabilities_.request();
-        double* ptr_prob = (double*)buf_prob.ptr;
-        probabilities.assign(ptr_prob, ptr_prob + buf_prob.size);
-    }
-
-    int num_inl = findPnP_(
-        correspondences, inliers, pose, probabilities,
-        sampler, use_magsac_plus_plus, sigma_th, conf,
-        min_iters, max_iters, partition_num);
-
-    py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
-    py::buffer_info buf3 = inliers_.request();
-    bool* ptr3 = (bool*)buf3.ptr;
-    for (size_t i = 0; i < NUM_TENTS; i++)
-        ptr3[i] = inliers[i];
-
-    if (num_inl == 0)
-        return py::make_tuple(pybind11::cast<pybind11::none>(Py_None), inliers_);
-
-    py::array_t<double> pose_ = py::array_t<double>({3, 4});
-    py::buffer_info buf2 = pose_.request();
-    double* ptr2 = (double*)buf2.ptr;
-    for (size_t i = 0; i < 12; i++)
-        ptr2[i] = pose[i];
-
-    return py::make_tuple(pose_, inliers_);
-}
-
-py::tuple findPnPAC(
-    py::array_t<double> correspondences_, py::array_t<double> probabilities_,
-    int sampler, bool use_magsac_plus_plus,
-    double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
-{
-    py::buffer_info buf1 = correspondences_.request();
-    size_t NUM_TENTS = buf1.shape[0];
-    if (buf1.shape[1] != 12) throw std::invalid_argument("correspondences should be [n,12], n>=1");
-    if (NUM_TENTS < 1) throw std::invalid_argument("correspondences should be [n,12], n>=1");
-
-    double* ptr1 = (double*)buf1.ptr;
-    std::vector<double> correspondences(ptr1, ptr1 + buf1.size);
-    std::vector<double> pose(12);
-    std::vector<bool> inliers(NUM_TENTS);
-    std::vector<double> probabilities;
-
-    int num_inl = findPnPAC_(correspondences, inliers, pose, probabilities,
-        sampler, use_magsac_plus_plus, sigma_th, conf, min_iters, max_iters, partition_num);
-
-    py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
-    bool* ptr3 = (bool*)inliers_.request().ptr;
-    for (size_t i = 0; i < NUM_TENTS; i++) ptr3[i] = inliers[i];
-    if (num_inl == 0) return py::make_tuple(pybind11::cast<pybind11::none>(Py_None), inliers_);
-
-    py::array_t<double> pose_ = py::array_t<double>({3, 4});
-    double* ptr2 = (double*)pose_.request().ptr;
-    for (int i = 0; i < 12; i++) ptr2[i] = pose[i];
-    return py::make_tuple(pose_, inliers_);
-}
-
-py::tuple findPnPSIFT(
-    py::array_t<double> correspondences_, py::array_t<double> probabilities_,
-    int sampler, bool use_magsac_plus_plus,
-    double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
-{
-    py::buffer_info buf1 = correspondences_.request();
-    size_t NUM_TENTS = buf1.shape[0];
-    if (buf1.shape[1] != 12) throw std::invalid_argument("correspondences should be [n,12], n>=1");
-    if (NUM_TENTS < 1) throw std::invalid_argument("correspondences should be [n,12], n>=1");
-
-    double* ptr1 = (double*)buf1.ptr;
-    std::vector<double> correspondences(ptr1, ptr1 + buf1.size);
-    std::vector<double> pose(12);
-    std::vector<bool> inliers(NUM_TENTS);
-    std::vector<double> probabilities;
-
-    int num_inl = findPnPSIFT_(correspondences, inliers, pose, probabilities,
-        sampler, use_magsac_plus_plus, sigma_th, conf, min_iters, max_iters, partition_num);
-
-    py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
-    bool* ptr3 = (bool*)inliers_.request().ptr;
-    for (size_t i = 0; i < NUM_TENTS; i++) ptr3[i] = inliers[i];
-    if (num_inl == 0) return py::make_tuple(pybind11::cast<pybind11::none>(Py_None), inliers_);
-
-    py::array_t<double> pose_ = py::array_t<double>({3, 4});
-    double* ptr2 = (double*)pose_.request().ptr;
-    for (int i = 0; i < 12; i++) ptr2[i] = pose[i];
-    return py::make_tuple(pose_, inliers_);
-}
-
-py::tuple findRadialHomography(
-    py::array_t<double> correspondences_,
-    py::array_t<double> probabilities_,
-    int sampler,
-    bool use_magsac_plus_plus,
-    double sigma_th,
-    double conf,
-    int min_iters,
-    int max_iters,
-    int partition_num)
-{
-    py::buffer_info buf1 = correspondences_.request();
-    size_t NUM_TENTS = buf1.shape[0];
-    size_t DIM = buf1.shape[1];
-
-    if (DIM != 4)
-        throw std::invalid_argument("correspondences should be [n,4], n>=5");
-    if (NUM_TENTS < 5)
-        throw std::invalid_argument("correspondences should be [n,4], n>=5");
-
-    double* ptr1 = (double*)buf1.ptr;
-    std::vector<double> correspondences;
-    correspondences.assign(ptr1, ptr1 + buf1.size);
-
-    std::vector<double> H(9);
-    std::vector<bool> inliers(NUM_TENTS);
-
-    std::vector<double> probabilities;
-    if (sampler == 3 || sampler == 4)
-    {
-        py::buffer_info buf_prob = probabilities_.request();
-        double* ptr_prob = (double*)buf_prob.ptr;
-        probabilities.assign(ptr_prob, ptr_prob + buf_prob.size);
-    }
-
-    int num_inl = findRadialHomography_(
-        correspondences, inliers, H, probabilities,
-        sampler, use_magsac_plus_plus, sigma_th, conf,
-        min_iters, max_iters, partition_num);
-
-    py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
-    py::buffer_info buf3 = inliers_.request();
-    bool* ptr3 = (bool*)buf3.ptr;
-    for (size_t i = 0; i < NUM_TENTS; i++)
-        ptr3[i] = inliers[i];
-
-    if (num_inl == 0)
-        return py::make_tuple(pybind11::cast<pybind11::none>(Py_None), inliers_);
-
-    // Output the descriptor as-is
-    size_t h_size = H.size();
-    py::array_t<double> H_ = py::array_t<double>({(int)h_size});
-    py::buffer_info buf2 = H_.request();
-    double* ptr2 = (double*)buf2.ptr;
-    for (size_t i = 0; i < h_size; i++)
-        ptr2[i] = H[i];
-
-    return py::make_tuple(H_, inliers_);
-}
-
-py::tuple findHomographyAffine(
-    py::array_t<double> correspondences_,
-    py::array_t<double> probabilities_,
-    int sampler, bool use_magsac_plus_plus,
-    double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
-{
-    py::buffer_info buf1 = correspondences_.request();
-    size_t NUM_TENTS = buf1.shape[0];
-    if (buf1.shape[1] != 8)
-        throw std::invalid_argument("correspondences should be [n,8] (x1,y1,x2,y2,a11,a12,a21,a22), n>=2");
-    if (NUM_TENTS < 2)
-        throw std::invalid_argument("correspondences should be [n,8], n>=2");
-
-    double* ptr1 = (double*)buf1.ptr;
-    std::vector<double> correspondences(ptr1, ptr1 + buf1.size);
-    std::vector<double> H(9);
-    std::vector<bool> inliers(NUM_TENTS);
-    std::vector<double> probabilities;
-
-    int num_inl = findHomographyAffine_(correspondences, inliers, H, probabilities,
-        sampler, use_magsac_plus_plus, sigma_th, conf, min_iters, max_iters, partition_num);
-
-    py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
-    bool* ptr3 = (bool*)inliers_.request().ptr;
-    for (size_t i = 0; i < NUM_TENTS; i++) ptr3[i] = inliers[i];
-
-    if (num_inl == 0) return py::make_tuple(pybind11::cast<pybind11::none>(Py_None), inliers_);
-
-    py::array_t<double> H_ = py::array_t<double>({3, 3});
-    double* ptr2 = (double*)H_.request().ptr;
-    for (int i = 0; i < 9; i++) ptr2[i] = H[i];
-    return py::make_tuple(H_, inliers_);
-}
-
-py::tuple findFundamentalMatrixAffine(
-    py::array_t<double> correspondences_,
-    py::array_t<double> probabilities_,
-    int sampler, bool use_magsac_plus_plus,
-    double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
-{
-    py::buffer_info buf1 = correspondences_.request();
-    size_t NUM_TENTS = buf1.shape[0];
-    if (buf1.shape[1] != 8)
-        throw std::invalid_argument("correspondences should be [n,8] (x1,y1,x2,y2,a11,a12,a21,a22), n>=4");
-    if (NUM_TENTS < 4)
-        throw std::invalid_argument("correspondences should be [n,8], n>=4");
-
-    double* ptr1 = (double*)buf1.ptr;
-    std::vector<double> correspondences(ptr1, ptr1 + buf1.size);
-    std::vector<double> F(9);
-    std::vector<bool> inliers(NUM_TENTS);
-    std::vector<double> probabilities;
-
-    int num_inl = findFundamentalMatrixAffine_(correspondences, inliers, F, probabilities,
-        sampler, use_magsac_plus_plus, sigma_th, conf, min_iters, max_iters, partition_num);
-
-    py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
-    bool* ptr3 = (bool*)inliers_.request().ptr;
-    for (size_t i = 0; i < NUM_TENTS; i++) ptr3[i] = inliers[i];
-
-    if (num_inl == 0) return py::make_tuple(pybind11::cast<pybind11::none>(Py_None), inliers_);
-
-    py::array_t<double> F_ = py::array_t<double>({3, 3});
-    double* ptr2 = (double*)F_.request().ptr;
-    for (int i = 0; i < 9; i++) ptr2[i] = F[i];
-    return py::make_tuple(F_, inliers_);
-}
-
-py::tuple findEssentialMatrixPlanar(
-    py::array_t<double> correspondences_,
-    py::array_t<double> K1_, py::array_t<double> K2_,
-    py::array_t<double> probabilities_,
-    int sampler, bool use_magsac_plus_plus,
-    double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
-{
-    py::buffer_info buf1 = correspondences_.request();
-    size_t NUM_TENTS = buf1.shape[0];
-    if (buf1.shape[1] != 4) throw std::invalid_argument("correspondences should be [n,4], n>=2");
-    if (NUM_TENTS < 2) throw std::invalid_argument("correspondences should be [n,4], n>=2");
-
-    double* ptr1 = (double*)buf1.ptr;
-    std::vector<double> correspondences(ptr1, ptr1 + buf1.size);
-
-    py::buffer_info K1_buf = K1_.request(), K2_buf = K2_.request();
-    if (K1_buf.shape[0] != 3 || K1_buf.shape[1] != 3) throw std::invalid_argument("K1 should be [3,3]");
-    if (K2_buf.shape[0] != 3 || K2_buf.shape[1] != 3) throw std::invalid_argument("K2 should be [3,3]");
-    std::vector<double> K1((double*)K1_buf.ptr, (double*)K1_buf.ptr + 9);
-    std::vector<double> K2((double*)K2_buf.ptr, (double*)K2_buf.ptr + 9);
-
-    std::vector<double> E(9);
-    std::vector<bool> inliers(NUM_TENTS);
-    std::vector<double> probabilities;
-
-    int num_inl = findEssentialMatrixPlanar_(correspondences, inliers, E, K1, K2, probabilities,
-        sampler, use_magsac_plus_plus, sigma_th, conf, min_iters, max_iters, partition_num);
-
-    py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
-    bool* ptr3 = (bool*)inliers_.request().ptr;
-    for (size_t i = 0; i < NUM_TENTS; i++) ptr3[i] = inliers[i];
-    if (num_inl == 0) return py::make_tuple(pybind11::cast<pybind11::none>(Py_None), inliers_);
-
-    py::array_t<double> E_ = py::array_t<double>({3, 3});
-    double* ptr2 = (double*)E_.request().ptr;
-    for (int i = 0; i < 9; i++) ptr2[i] = E[i];
-    return py::make_tuple(E_, inliers_);
-}
-
-py::tuple findEssentialMatrixGravity(
-    py::array_t<double> correspondences_,
-    py::array_t<double> K1_, py::array_t<double> K2_,
-    py::array_t<double> gravity_src_, py::array_t<double> gravity_dst_,
-    py::array_t<double> probabilities_,
-    int sampler, bool use_magsac_plus_plus,
-    double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
-{
-    py::buffer_info buf1 = correspondences_.request();
-    size_t NUM_TENTS = buf1.shape[0];
-    if (buf1.shape[1] != 4) throw std::invalid_argument("correspondences should be [n,4], n>=3");
-    if (NUM_TENTS < 3) throw std::invalid_argument("correspondences should be [n,4], n>=3");
-
-    double* ptr1 = (double*)buf1.ptr;
-    std::vector<double> correspondences(ptr1, ptr1 + buf1.size);
-
-    py::buffer_info K1_buf = K1_.request(), K2_buf = K2_.request();
-    if (K1_buf.shape[0] != 3 || K1_buf.shape[1] != 3) throw std::invalid_argument("K1 should be [3,3]");
-    if (K2_buf.shape[0] != 3 || K2_buf.shape[1] != 3) throw std::invalid_argument("K2 should be [3,3]");
-    std::vector<double> K1((double*)K1_buf.ptr, (double*)K1_buf.ptr + 9);
-    std::vector<double> K2((double*)K2_buf.ptr, (double*)K2_buf.ptr + 9);
-
-    py::buffer_info gs_buf = gravity_src_.request(), gd_buf = gravity_dst_.request();
-    if (gs_buf.shape[0] != 3 || gs_buf.shape[1] != 3) throw std::invalid_argument("gravity_src should be [3,3]");
-    if (gd_buf.shape[0] != 3 || gd_buf.shape[1] != 3) throw std::invalid_argument("gravity_dst should be [3,3]");
-    std::vector<double> gravity_src((double*)gs_buf.ptr, (double*)gs_buf.ptr + 9);
-    std::vector<double> gravity_dst((double*)gd_buf.ptr, (double*)gd_buf.ptr + 9);
-
-    std::vector<double> E(9);
-    std::vector<bool> inliers(NUM_TENTS);
-    std::vector<double> probabilities;
-
-    int num_inl = findEssentialMatrixGravity_(correspondences, inliers, E, K1, K2,
-        gravity_src, gravity_dst, probabilities,
-        sampler, use_magsac_plus_plus, sigma_th, conf, min_iters, max_iters, partition_num);
-
-    py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
-    bool* ptr3 = (bool*)inliers_.request().ptr;
-    for (size_t i = 0; i < NUM_TENTS; i++) ptr3[i] = inliers[i];
-    if (num_inl == 0) return py::make_tuple(pybind11::cast<pybind11::none>(Py_None), inliers_);
-
-    py::array_t<double> E_ = py::array_t<double>({3, 3});
-    double* ptr2 = (double*)E_.request().ptr;
-    for (int i = 0; i < 9; i++) ptr2[i] = E[i];
-    return py::make_tuple(E_, inliers_);
-}
-
 py::tuple findHomography(
     py::array_t<double>  correspondences_,
     double w1, 
@@ -865,6 +467,129 @@ py::tuple findHomography(
     
     return py::make_tuple(H_,inliers_);
                          }
+namespace
+{
+    typedef py::array_t<double, py::array::c_style | py::array::forcecast> DoubleArray;
+
+    // Copies an array of dims [n, cols], n >= min_rows, to a row-major vector.
+    std::vector<double> readRows(const DoubleArray& array, py::ssize_t cols, py::ssize_t min_rows, const char* what)
+    {
+        if (array.ndim() != 2 || array.shape(1) != cols || array.shape(0) < min_rows)
+            throw std::invalid_argument(std::string(what) + " should be an array with dims [n," +
+                std::to_string(cols) + "], n>=" + std::to_string(min_rows));
+        return std::vector<double>(array.data(), array.data() + array.size());
+    }
+
+    // Copies a 3x3 matrix to a row-major vector.
+    std::vector<double> readMatrix3(const DoubleArray& array, const char* what)
+    {
+        if (array.ndim() != 2 || array.shape(0) != 3 || array.shape(1) != 3)
+            throw std::invalid_argument(std::string(what) + " should be an array with dims [3,3]");
+        return std::vector<double>(array.data(), array.data() + 9);
+    }
+
+    // The inlier probabilities, used only by samplers 3 (NG-RANSAC) and 4 (AR-Sampler).
+    std::vector<double> readProbabilities(int sampler, const DoubleArray& probabilities)
+    {
+        if (sampler != 3 && sampler != 4)
+            return {};
+        return std::vector<double>(probabilities.data(), probabilities.data() + probabilities.size());
+    }
+
+    // The model as an array of the given shape, or None if no model was found.
+    py::object toArray(int num_inliers, const std::vector<double>& values, std::vector<py::ssize_t> shape)
+    {
+        if (num_inliers == 0)
+            return py::none();
+        DoubleArray array(shape);
+        std::copy(values.begin(), values.end(), array.mutable_data());
+        return std::move(array);
+    }
+
+    py::array_t<bool> toMask(const std::vector<bool>& inliers)
+    {
+        py::array_t<bool> mask(inliers.size());
+        std::copy(inliers.begin(), inliers.end(), mask.mutable_data());
+        return mask;
+    }
+}
+
+py::tuple findPlane3D(DoubleArray points_, DoubleArray probabilities_, int sampler, bool use_magsac_plus_plus,
+    double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
+{
+    std::vector<double> points = readRows(points_, 3, 3, "points");
+    std::vector<double> probabilities = readProbabilities(sampler, probabilities_);
+    std::vector<bool> inliers;
+    std::vector<double> plane;
+    const int num_inliers = findPlane3D_(points, inliers, plane, probabilities, sampler, use_magsac_plus_plus,
+        sigma_th, conf, min_iters, max_iters, partition_num);
+    return py::make_tuple(toArray(num_inliers, plane, { 4 }), toMask(inliers));
+}
+
+py::tuple findPnP(DoubleArray correspondences_, DoubleArray probabilities_, int sampler, bool use_magsac_plus_plus,
+    double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
+{
+    std::vector<double> correspondences = readRows(correspondences_, 5, 3, "correspondences");
+    std::vector<double> probabilities = readProbabilities(sampler, probabilities_);
+    std::vector<bool> inliers;
+    std::vector<double> pose;
+    const int num_inliers = findPnP_(correspondences, inliers, pose, probabilities, sampler, use_magsac_plus_plus,
+        sigma_th, conf, min_iters, max_iters, partition_num);
+    return py::make_tuple(toArray(num_inliers, pose, { 3, 4 }), toMask(inliers));
+}
+
+py::tuple findRadialHomography(DoubleArray correspondences_, DoubleArray probabilities_, int sampler, bool use_magsac_plus_plus,
+    double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
+{
+    std::vector<double> correspondences = readRows(correspondences_, 4, 5, "correspondences");
+    std::vector<double> probabilities = readProbabilities(sampler, probabilities_);
+    std::vector<bool> inliers;
+    std::vector<double> H, distortion;
+    const int num_inliers = findRadialHomography_(correspondences, inliers, H, distortion, probabilities, sampler,
+        use_magsac_plus_plus, sigma_th, conf, min_iters, max_iters, partition_num);
+    return py::make_tuple(toArray(num_inliers, H, { 3, 3 }), toArray(num_inliers, distortion, { 2 }), toMask(inliers));
+}
+
+py::tuple findHomographyAffine(DoubleArray correspondences_, DoubleArray probabilities_, int sampler, bool use_magsac_plus_plus,
+    double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
+{
+    std::vector<double> correspondences = readRows(correspondences_, 8, 2, "correspondences");
+    std::vector<double> probabilities = readProbabilities(sampler, probabilities_);
+    std::vector<bool> inliers;
+    std::vector<double> H;
+    const int num_inliers = findHomographyAffine_(correspondences, inliers, H, probabilities, sampler,
+        use_magsac_plus_plus, sigma_th, conf, min_iters, max_iters, partition_num);
+    return py::make_tuple(toArray(num_inliers, H, { 3, 3 }), toMask(inliers));
+}
+
+py::tuple findEssentialMatrixPlanar(DoubleArray correspondences_, DoubleArray K1_, DoubleArray K2_, DoubleArray probabilities_,
+    int sampler, bool use_magsac_plus_plus, double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
+{
+    std::vector<double> correspondences = readRows(correspondences_, 4, 2, "correspondences");
+    std::vector<double> K1 = readMatrix3(K1_, "K1"), K2 = readMatrix3(K2_, "K2");
+    std::vector<double> probabilities = readProbabilities(sampler, probabilities_);
+    std::vector<bool> inliers;
+    std::vector<double> E;
+    const int num_inliers = findEssentialMatrixPlanar_(correspondences, inliers, E, K1, K2, probabilities, sampler,
+        use_magsac_plus_plus, sigma_th, conf, min_iters, max_iters, partition_num);
+    return py::make_tuple(toArray(num_inliers, E, { 3, 3 }), toMask(inliers));
+}
+
+py::tuple findEssentialMatrixGravity(DoubleArray correspondences_, DoubleArray K1_, DoubleArray K2_,
+    DoubleArray gravity_src_, DoubleArray gravity_dst_, DoubleArray probabilities_,
+    int sampler, bool use_magsac_plus_plus, double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
+{
+    std::vector<double> correspondences = readRows(correspondences_, 4, 3, "correspondences");
+    std::vector<double> K1 = readMatrix3(K1_, "K1"), K2 = readMatrix3(K2_, "K2");
+    std::vector<double> gravity_src = readMatrix3(gravity_src_, "gravity_src"), gravity_dst = readMatrix3(gravity_dst_, "gravity_dst");
+    std::vector<double> probabilities = readProbabilities(sampler, probabilities_);
+    std::vector<bool> inliers;
+    std::vector<double> E;
+    const int num_inliers = findEssentialMatrixGravity_(correspondences, inliers, E, K1, K2, gravity_src, gravity_dst,
+        probabilities, sampler, use_magsac_plus_plus, sigma_th, conf, min_iters, max_iters, partition_num);
+    return py::make_tuple(toArray(num_inliers, E, { 3, 3 }), toMask(inliers));
+}
+
 PYBIND11_PLUGIN(pymagsac) {
                                                                              
     py::module m("pymagsac", R"doc(
@@ -960,110 +685,88 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("max_iters") = 1000,
         py::arg("partition_num") = 5); 
 
-  m.def("findPlane3D", &findPlane3D, R"doc(some doc)doc",
+  m.def("findPlane3D", &findPlane3D, R"doc(Fits a plane (a, b, c, d), with ax + by + cz + d = 0 and a unit normal (a, b, c), to points [n,3].
+Returns (plane, mask).)doc",
         py::arg("points"),
         py::arg("probabilities"),
-		py::arg("sampler") = 0,
+        py::arg("sampler") = 0,
         py::arg("use_magsac_plus_plus") = true,
         py::arg("sigma_th") = 1.0,
         py::arg("conf") = 0.99,
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5); 
+        py::arg("partition_num") = 5);
 
-  m.def("findPnP", &findPnP, R"doc(some doc)doc",
+  m.def("findPnP", &findPnP, R"doc(Fits a camera pose [R | t] (3x4), x_camera = R x_world + t, to correspondences [n,5]: (u, v, x, y, z),
+where (u, v) are normalized image coordinates (K^-1 applied) and (x, y, z) the world point. sigma_th is in normalized coordinates.
+Returns (pose, mask).)doc",
         py::arg("correspondences"),
         py::arg("probabilities"),
-		py::arg("sampler") = 0,
+        py::arg("sampler") = 0,
         py::arg("use_magsac_plus_plus") = true,
         py::arg("sigma_th") = 1.0,
         py::arg("conf") = 0.99,
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5); 
+        py::arg("partition_num") = 5);
 
-  m.def("findPnPAC", &findPnPAC, R"doc(some doc)doc",
+  m.def("findRadialHomography", &findRadialHomography, R"doc(Fits a homography H and the radial distortion (lambda_1, lambda_2) of the division model
+in each image to correspondences [n,4]: (x1, y1, x2, y2), with coordinates relative to the distortion centres (for example,
+the image centres, scaled by the image size). An undistorted point is (x, y, 1 + lambda * (x^2 + y^2)).
+Returns (H, distortion, mask).)doc",
         py::arg("correspondences"),
         py::arg("probabilities"),
-		py::arg("sampler") = 0,
+        py::arg("sampler") = 0,
         py::arg("use_magsac_plus_plus") = true,
         py::arg("sigma_th") = 1.0,
         py::arg("conf") = 0.99,
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5); 
+        py::arg("partition_num") = 5);
 
-  m.def("findPnPSIFT", &findPnPSIFT, R"doc(some doc)doc",
+  m.def("findHomographyAffine", &findHomographyAffine, R"doc(Fits a homography to affine correspondences [n,8]: (x1, y1, x2, y2, a11, a12, a21, a22),
+where A = [[a11, a12], [a21, a22]] maps a neighbourhood of (x1, y1) to one of (x2, y2). Returns (H, mask).)doc",
         py::arg("correspondences"),
         py::arg("probabilities"),
-		py::arg("sampler") = 0,
+        py::arg("sampler") = 0,
         py::arg("use_magsac_plus_plus") = true,
         py::arg("sigma_th") = 1.0,
         py::arg("conf") = 0.99,
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5); 
+        py::arg("partition_num") = 5);
 
-  m.def("findRadialHomography", &findRadialHomography, R"doc(some doc)doc",
-        py::arg("correspondences"),
-        py::arg("probabilities"),
-		py::arg("sampler") = 0,
-        py::arg("use_magsac_plus_plus") = true,
-        py::arg("sigma_th") = 1.0,
-        py::arg("conf") = 0.99,
-        py::arg("min_iters") = 50,
-        py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5); 
-
-  m.def("findHomographyAffine", &findHomographyAffine, R"doc(some doc)doc",
-        py::arg("correspondences"),
-        py::arg("probabilities"),
-		py::arg("sampler") = 0,
-        py::arg("use_magsac_plus_plus") = true,
-        py::arg("sigma_th") = 1.0,
-        py::arg("conf") = 0.99,
-        py::arg("min_iters") = 50,
-        py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5); 
-
-  m.def("findFundamentalMatrixAffine", &findFundamentalMatrixAffine, R"doc(some doc)doc",
-        py::arg("correspondences"),
-        py::arg("probabilities"),
-		py::arg("sampler") = 0,
-        py::arg("use_magsac_plus_plus") = true,
-        py::arg("sigma_th") = 1.0,
-        py::arg("conf") = 0.99,
-        py::arg("min_iters") = 50,
-        py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5); 
-
-  m.def("findEssentialMatrixPlanar", &findEssentialMatrixPlanar, R"doc(some doc)doc",
+  m.def("findEssentialMatrixPlanar", &findEssentialMatrixPlanar, R"doc(Fits an essential matrix assuming a planar motion (rotation about the camera's y axis,
+translation in its xz plane) to correspondences [n,4] in pixels, given the intrinsics K1 and K2. sigma_th is in pixels.
+Returns (E, mask).)doc",
         py::arg("correspondences"),
         py::arg("K1"),
         py::arg("K2"),
         py::arg("probabilities"),
-		py::arg("sampler") = 0,
+        py::arg("sampler") = 0,
         py::arg("use_magsac_plus_plus") = true,
         py::arg("sigma_th") = 1.0,
         py::arg("conf") = 0.99,
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5); 
+        py::arg("partition_num") = 5);
 
-  m.def("findEssentialMatrixGravity", &findEssentialMatrixGravity, R"doc(some doc)doc",
+  m.def("findEssentialMatrixGravity", &findEssentialMatrixGravity, R"doc(Fits an essential matrix to correspondences [n,4] in pixels, given the intrinsics K1 and K2
+and the rotations gravity_src and gravity_dst that align each camera's y axis with gravity (so the remaining rotation is about
+the vertical axis). sigma_th is in pixels. Returns (E, mask).)doc",
         py::arg("correspondences"),
         py::arg("K1"),
         py::arg("K2"),
         py::arg("gravity_src"),
         py::arg("gravity_dst"),
         py::arg("probabilities"),
-		py::arg("sampler") = 0,
+        py::arg("sampler") = 0,
         py::arg("use_magsac_plus_plus") = true,
         py::arg("sigma_th") = 1.0,
         py::arg("conf") = 0.99,
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5); 
+        py::arg("partition_num") = 5);
 
 
   return m.ptr();

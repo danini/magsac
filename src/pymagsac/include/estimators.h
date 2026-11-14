@@ -9,17 +9,10 @@
 #include "estimators/radial_homography_estimator.h"
 #include "estimators/homography_affine_correspondence_estimator.h"
 #include "estimators/solver_p3p.h"
-#include "estimators/solver_epnp_lm.h"
 #include "estimators/solver_pnp_bundle_adjustment.h"
-#include "estimators/solver_acp1p_cayley.h"
-#include "estimators/solver_acp1p_query.h"
-#include "estimators/solver_siftp1p.h"
-#include "estimators/solver_siftp2p.h"
 #include "estimators/solver_radial_homography_5pc.h"
 #include "estimators/solver_radial_homography_6pc.h"
 #include "estimators/solver_homography_two_affine.h"
-#include "estimators/solver_fundamental_matrix_four_sift.h"
-#include "estimators/solver_fundamental_matrix_three_affine.h"
 #include "estimators/solver_essential_matrix_two_points_planar.h"
 #include "estimators/solver_essential_matrix_three_points_gravity.h"
 #include "model.h"
@@ -52,34 +45,34 @@ namespace magsac
 
 			static constexpr double getSigmaQuantile()
 			{
-				return 3.0348542587702925;
+				return 3.64;
 			}
 
 			static constexpr size_t getDegreesOfFreedom()
 			{
-				return 2;
+				return 4;
 			}
 
 			static constexpr double getC()
 			{
-				return 0.14104739588693907;
+				return 0.25;
 			}
 
 			// Calculating the upper incomplete gamma value of (DoF - 1) / 2 with k^2 / 2.
 			static constexpr double getGammaFunction()
 			{
-				return 1.7724538509055159;
+				return 1.0;
 			}
 
 			static constexpr double getUpperIncompleteGammaOfK()
 			{
-				return 0.0042654446820694645;
+				return 0.0036572608340910764;
 			}
 
 			// Calculating the lower incomplete gamma value of (DoF + 1) / 2 with k^2 / 2.
 			static constexpr double getLowerIncompleteGammaOfK()
 			{
-				return 0.86263454284882968;
+				return 1.3012265540498875;
 			}
 
 			static constexpr double getChiSquareParamCp()
@@ -118,12 +111,12 @@ namespace magsac
 
 			static constexpr double getSigmaQuantile()
 			{
-				return 3.3682141752187271;
+				return 3.64;
 			}
 
 			static constexpr size_t getDegreesOfFreedom()
 			{
-				return 3;
+				return 4;
 			}
 
 			static constexpr double getGammaFunction()
@@ -139,13 +132,13 @@ namespace magsac
 			// Calculating the upper incomplete gamma value of (DoF - 1) / 2 with k^2 / 2.
 			static constexpr double getUpperIncompleteGammaOfK()
 			{
-				return 0.0034394855607548570;
+				return 0.0036572608340910764;
 			}
 
 			// Calculating the lower incomplete gamma value of (DoF + 1) / 2 with k^2 / 2.
 			static constexpr double getLowerIncompleteGammaOfK()
 			{
-				return 0.97705026178573529;
+				return 1.3012265540498875;
 			}
 
 			static constexpr double getChiSquareParamCp()
@@ -630,12 +623,12 @@ namespace magsac
 
 			static constexpr double getSigmaQuantile()
 			{
-				return 2.5758293035489008;
+				return 3.64;
 			}
 			
 			static constexpr size_t getDegreesOfFreedom()
 			{
-				return 1;
+				return 4;
 			}
 
 			static constexpr double getC()
@@ -645,7 +638,7 @@ namespace magsac
 
 			static constexpr double getGammaFunction()
 			{
-				return 1.0; // Not used for DoF=1 (Γ(0) diverges); kept for interface compatibility
+				return 1.0;
 			}
 
 			static constexpr bool doesNormalizationForNonMinimalFitting()
@@ -656,13 +649,13 @@ namespace magsac
 			// Calculating the upper incomplete gamma value of (DoF - 1) / 2 with k^2 / 2.
 			static constexpr double getUpperIncompleteGammaOfK()
 			{
-				return 0.0087462271161219563;
+				return 0.0036572608340910764;
 			}
 
 			// Calculating the lower incomplete gamma value of (DoF + 1) / 2 with k^2 / 2.
 			static constexpr double getLowerIncompleteGammaOfK()
 			{
-				return 0.96375479928483043;
+				return 1.3012265540498875;
 			}
 
 			static constexpr double getChiSquareParamCp()
@@ -671,141 +664,33 @@ namespace magsac
 			}
 		};
 
-		// This is the estimator class for estimating a 3D plane from a point cloud.
-		template<class _MinimalSolverEngine,  // The solver used for estimating the model from a minimal sample
-			class _NonMinimalSolverEngine> // The solver used for estimating the model from a non-minimal sample
-			class Plane3DEstimator :
-			public gcransac::estimator::LinearModelEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine, 3>
+		// Adds what MAGSAC needs to a graph-cut-ransac estimator: the residual used for scoring
+		// and the constants of the chi-square distribution, which are those of the estimators above
+		// (4 degrees of freedom). _NormalizesForNonMinimalFitting tells whether the estimator's
+		// non-minimal fit copies the points it uses (so it reads one weight per used point) or
+		// reads them from the full data (one weight per data point).
+		template<class _Estimator, bool _NormalizesForNonMinimalFitting>
+		class Wrapper : public _Estimator
 		{
 		public:
-			using gcransac::estimator::LinearModelEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine, 3>::residual;
-
-			Plane3DEstimator() :
-				gcransac::estimator::LinearModelEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine, 3>()
-			{}
+			using _Estimator::_Estimator;
+			using _Estimator::residual;
 
 			inline double residualForScoring(const cv::Mat& point_,
-                const gcransac::Model& model_) const
+				const gcransac::Model& model_) const
 			{
 				return residual(point_, model_.descriptor);
 			}
 
-			static constexpr double getSigmaQuantile()
-			{
-				return 2.5758293035489008;
-			}
-			
-			static constexpr size_t getDegreesOfFreedom()
-			{
-				return 1;
-			}
-
-			static constexpr double getC()
-			{
-				return 0.25;
-			}
-
-			static constexpr double getGammaFunction()
-			{
-				return 1.0; // Not used for DoF=1 (Γ(0) diverges); kept for interface compatibility
-			}
-
-			static constexpr bool doesNormalizationForNonMinimalFitting()
-			{
-				return false;
-			}
-
-			static constexpr double getUpperIncompleteGammaOfK()
-			{
-				return 0.0087462271161219563;
-			}
-
-			static constexpr double getLowerIncompleteGammaOfK()
-			{
-				return 0.96375479928483043;
-			}
-
-			static constexpr double getChiSquareParamCp()
-			{
-				return 1.0 / (4.0 * getGammaFunction());
-			}
-		};
-
-		// MAGSAC wrapper for PnP estimation
-		template<class _MinimalSolverEngine, class _NonMinimalSolverEngine>
-			class PerspectiveNPointEstimator :
-			public gcransac::estimator::PerspectiveNPointEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>
-		{
-		public:
-			using gcransac::estimator::PerspectiveNPointEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>::residual;
-
-			PerspectiveNPointEstimator() :
-				gcransac::estimator::PerspectiveNPointEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>()
-			{}
-
-			inline double residualForScoring(const cv::Mat& point_,
-                const gcransac::Model& model_) const
-			{ return residual(point_, model_.descriptor); }
-
-			static constexpr double getSigmaQuantile() { return 3.0348542587702925; }
-			static constexpr size_t getDegreesOfFreedom() { return 2; }
-			static constexpr double getC() { return 0.14104739588693907; }
-			static constexpr double getGammaFunction() { return 1.7724538509055159; }
-			static constexpr bool doesNormalizationForNonMinimalFitting() { return false; }
-			static constexpr double getUpperIncompleteGammaOfK() { return 0.0042654446820694645; }
-			static constexpr double getLowerIncompleteGammaOfK() { return 0.86263454284882968; }
-			static constexpr double getChiSquareParamCp() { return 1.0 / (4.0 * getGammaFunction()); }
-		};
-
-		// MAGSAC wrapper for radial homography estimation
-		template<class _MinimalSolverEngine, class _NonMinimalSolverEngine>
-			class RadialHomographyEstimator :
-			public gcransac::estimator::RadialHomographyEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>
-		{
-		public:
-			using gcransac::estimator::RadialHomographyEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>::residual;
-
-			RadialHomographyEstimator() :
-				gcransac::estimator::RadialHomographyEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>()
-			{}
-
-			inline double residualForScoring(const cv::Mat& point_,
-                const gcransac::Model& model_) const
-			{ return residual(point_, model_.descriptor); }
-
-			static constexpr double getSigmaQuantile() { return 3.0348542587702925; }
-			static constexpr size_t getDegreesOfFreedom() { return 2; }
-			static constexpr double getC() { return 0.14104739588693907; }
-			static constexpr double getGammaFunction() { return 1.7724538509055159; }
-			static constexpr bool doesNormalizationForNonMinimalFitting() { return true; }
-			static constexpr double getUpperIncompleteGammaOfK() { return 0.0042654446820694645; }
-			static constexpr double getLowerIncompleteGammaOfK() { return 0.86263454284882968; }
-			static constexpr double getChiSquareParamCp() { return 1.0 / (4.0 * getGammaFunction()); }
-		};
-
-		// MAGSAC wrapper for homography from affine correspondences
-		template<class _MinimalSolverEngine, class _NonMinimalSolverEngine>
-			class HomographyAffineEstimator :
-			public gcransac::estimator::RobustHomographyAffineCorrespondenceEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>
-		{
-		public:
-			using gcransac::estimator::RobustHomographyAffineCorrespondenceEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>::residual;
-
-			HomographyAffineEstimator() :
-				gcransac::estimator::RobustHomographyAffineCorrespondenceEstimator<_MinimalSolverEngine, _NonMinimalSolverEngine>()
-			{}
-
-			inline double residualForScoring(const cv::Mat& point_,
-                const gcransac::Model& model_) const
-			{ return residual(point_, model_.descriptor); }
-
-			static constexpr double getSigmaQuantile() { return 3.0348542587702925; }
-			static constexpr size_t getDegreesOfFreedom() { return 2; }
-			static constexpr double getC() { return 0.14104739588693907; }
-			static constexpr double getGammaFunction() { return 1.7724538509055159; }
-			static constexpr bool doesNormalizationForNonMinimalFitting() { return true; }
-			static constexpr double getUpperIncompleteGammaOfK() { return 0.0042654446820694645; }
-			static constexpr double getLowerIncompleteGammaOfK() { return 0.86263454284882968; }
+			static constexpr double getSigmaQuantile() { return 3.64; }
+			static constexpr size_t getDegreesOfFreedom() { return 4; }
+			static constexpr double getC() { return 0.25; }
+			static constexpr double getGammaFunction() { return 1.0; }
+			static constexpr bool doesNormalizationForNonMinimalFitting() { return _NormalizesForNonMinimalFitting; }
+			// The upper incomplete gamma value of (DoF - 1) / 2 with k^2 / 2.
+			static constexpr double getUpperIncompleteGammaOfK() { return 0.0036572608340910764; }
+			// The lower incomplete gamma value of (DoF + 1) / 2 with k^2 / 2.
+			static constexpr double getLowerIncompleteGammaOfK() { return 1.3012265540498875; }
 			static constexpr double getChiSquareParamCp() { return 1.0 / (4.0 * getGammaFunction()); }
 		};
 	}
@@ -838,53 +723,33 @@ namespace magsac
 			Default2DLineEstimator;
 
 		// The default estimator for 3D plane fitting
-		typedef estimator::Plane3DEstimator<gcransac::estimator::solver::LinearModelSolver<3>, // The solver used for fitting a model to a minimal sample
-			gcransac::estimator::solver::LinearModelSolver<3>>  // The solver used for fitting a model to a non-minimal sample
+		typedef estimator::Wrapper<gcransac::estimator::LinearModelEstimator<gcransac::estimator::solver::LinearModelSolver<3>, // The solver used for fitting a model to a minimal sample
+			gcransac::estimator::solver::LinearModelSolver<3>, 3>, false> // The solver used for fitting a model to a non-minimal sample
 			Default3DPlaneEstimator;
 
-		// The default estimator for PnP (P3P minimal, PnP BA non-minimal) — matches upstream
-		typedef estimator::PerspectiveNPointEstimator<gcransac::estimator::solver::P3PSolver,
-			gcransac::estimator::solver::PnPBundleAdjustment>
+		// The default estimator for absolute pose (PnP) fitting
+		typedef estimator::Wrapper<gcransac::estimator::PerspectiveNPointEstimator<gcransac::estimator::solver::P3PSolver, // The solver used for fitting a model to a minimal sample
+			gcransac::estimator::solver::PnPBundleAdjustment>, false> // The solver used for fitting a model to a non-minimal sample
 			DefaultPnPEstimator;
 
-		// PnP from 1 affine correspondence (ACP1P)
-		typedef estimator::PerspectiveNPointEstimator<gcransac::estimator::solver::P1ACQuerySolver,
-			gcransac::estimator::solver::PnPBundleAdjustment>
-			DefaultACP1PEstimator;
-
-		// PnP from 1 SIFT correspondence (SIFTP1P)
-		typedef estimator::PerspectiveNPointEstimator<gcransac::estimator::solver::SIFTP1PSolver,
-			gcransac::estimator::solver::PnPBundleAdjustment>
-			DefaultSIFTP1PEstimator;
-
-		// PnP from 2 SIFT correspondences (SIFTP2P)
-		typedef estimator::PerspectiveNPointEstimator<gcransac::estimator::solver::SIFTP2PQuerySolver,
-			gcransac::estimator::solver::PnPBundleAdjustment>
-			DefaultSIFTP2PEstimator;
-
-		// The default estimator for radial homography — matches upstream
-		typedef estimator::RadialHomographyEstimator<gcransac::estimator::solver::RadialHomography5PC,
-			gcransac::estimator::solver::RadialHomography6PC>
+		// The default estimator for fitting a homography with radial distortion (division model)
+		typedef estimator::Wrapper<gcransac::estimator::RadialHomographyEstimator<gcransac::estimator::solver::RadialHomography5PC, // The solver used for fitting a model to a minimal sample
+			gcransac::estimator::solver::RadialHomography6PC>, false> // The solver used for fitting a model to a non-minimal sample
 			DefaultRadialHomographyEstimator;
 
-		// The default estimator for homography from affine correspondences — matches upstream
-		typedef estimator::HomographyAffineEstimator<gcransac::estimator::solver::HomographyTwoAffineSolver,
-			gcransac::estimator::solver::HomographyFourPointSolver>
+		// The default estimator for fitting a homography to affine correspondences
+		typedef estimator::Wrapper<gcransac::estimator::RobustHomographyAffineCorrespondenceEstimator<gcransac::estimator::solver::HomographyTwoAffineSolver, // The solver used for fitting a model to a minimal sample
+			gcransac::estimator::solver::HomographyFourPointSolver>, true> // The solver used for fitting a model to a non-minimal sample
 			DefaultHomographyAffineEstimator;
 
-		// The default estimator for fundamental matrix from SIFT correspondences — matches upstream
-		typedef estimator::FundamentalMatrixEstimator<gcransac::estimator::solver::FundamentalMatrixFourSIFTSolver,
-			gcransac::estimator::solver::FundamentalMatrixEightPointSolver>
-			DefaultFundamentalMatrixAffineSIFTEstimator;
-
-		// The default estimator for essential matrix (planar motion, 2 points) — matches upstream
-		typedef estimator::EssentialMatrixEstimator<gcransac::estimator::solver::EssentialMatrixTwoPointsPlanar,
-			gcransac::estimator::solver::EssentialMatrixBundleAdjustmentSolver>
+		// The default estimator for essential matrix fitting under planar motion
+		typedef estimator::EssentialMatrixEstimator<gcransac::estimator::solver::EssentialMatrixTwoPointsPlanar, // The solver used for fitting a model to a minimal sample
+			gcransac::estimator::solver::EssentialMatrixBundleAdjustmentSolver> // The solver used for fitting a model to a non-minimal sample
 			DefaultPlanarEssentialMatrixEstimator;
 
-		// The default estimator for essential matrix with gravity (3 points) — matches upstream
-		typedef estimator::EssentialMatrixEstimator<gcransac::estimator::solver::EssentialMatrixThreePointsGravity,
-			gcransac::estimator::solver::EssentialMatrixBundleAdjustmentSolver>
+		// The default estimator for essential matrix fitting with a known gravity direction
+		typedef estimator::EssentialMatrixEstimator<gcransac::estimator::solver::EssentialMatrixThreePointsGravity, // The solver used for fitting a model to a minimal sample
+			gcransac::estimator::solver::EssentialMatrixBundleAdjustmentSolver> // The solver used for fitting a model to a non-minimal sample
 			DefaultGravityEssentialMatrixEstimator;
 	}
 }
