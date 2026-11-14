@@ -517,9 +517,10 @@ PYBIND11_PLUGIN(pymagsac) {
 Returns (E, inlier mask); E is None on failure.
 
 sigma_th: the inlier threshold, in pixels: the largest residual of an inlier
-(MAGSAC++'s noise scale sigma_max is sigma_th / 3.64).
-reference_th: a threshold, in pixels, for the inliers counted to set the number
-of iterations, and of the symmetric epipolar check of the models. None (default):
+(MAGSAC++'s score takes the noise scale sigma_max as sigma_th / 3.64).
+reference_th: a threshold, in pixels, for the inliers counted to skip the models
+that can't beat the best one and, for MAGSAC++, to set the number of iterations;
+also the threshold of the symmetric epipolar check of the models. None (default):
 min(sigma_th, 1), which assumes pixels: in other units, pass 1 px in those units.)doc",
         py::arg("correspondences"),
         py::arg("K1"),
@@ -542,9 +543,10 @@ min(sigma_th, 1), which assumes pixels: in other units, pass 1 px in those units
 Returns (F, inlier mask); F is None on failure.
 
 sigma_th: the inlier threshold, in pixels: the largest residual of an inlier
-(MAGSAC++'s noise scale sigma_max is sigma_th / 3.64).
-reference_th: a threshold, in pixels, for the inliers counted to set the number
-of iterations, and of the symmetric epipolar check of the models. None (default):
+(MAGSAC++'s score takes the noise scale sigma_max as sigma_th / 3.64).
+reference_th: a threshold, in pixels, for the inliers counted to skip the models
+that can't beat the best one and, for MAGSAC++, to set the number of iterations;
+also the threshold of the symmetric epipolar check of the models. None (default):
 min(sigma_th, 1), which assumes pixels: in other units, pass 1 px in those units.)doc",
         py::arg("correspondences"),
         py::arg("w1"),
@@ -565,9 +567,10 @@ min(sigma_th, 1), which assumes pixels: in other units, pass 1 px in those units
 Returns (T, inlier mask); T is None on failure.
 
 sigma_th: the inlier threshold, in the data's units: the largest residual of an
-inlier (MAGSAC++'s noise scale sigma_max is sigma_th / 3.64).
-reference_th: a threshold, in the data's units, for the inliers counted to set
-the number of iterations, and of the check of the models. None (default): sigma_th.)doc",
+inlier (MAGSAC++'s score takes the noise scale sigma_max as sigma_th / 3.64).
+reference_th: a threshold, in the data's units, for the inliers counted to skip
+the models that can't beat the best one and, for MAGSAC++, to set the number of
+iterations; also the threshold of the check of the models. None (default): sigma_th.)doc",
         py::arg("correspondences"),
         py::arg("probabilities"),
 		py::arg("sampler") = 4,
@@ -583,10 +586,11 @@ the number of iterations, and of the check of the models. None (default): sigma_
 Returns (H, inlier mask); H is None on failure.
 
 sigma_th: the inlier threshold, in pixels: the largest residual of an inlier
-(MAGSAC++'s noise scale sigma_max is sigma_th / 3.64).
-reference_th: a threshold, in pixels, for the inliers counted to set the number
-of iterations. None (default): min(sigma_th, 1), which assumes pixels: in other
-units, pass 1 px in those units.)doc",
+(MAGSAC++'s score takes the noise scale sigma_max as sigma_th / 3.64).
+reference_th: a threshold, in pixels, for the inliers counted to skip the models
+that can't beat the best one and, for MAGSAC++, to set the number of iterations.
+None (default): min(sigma_th, 1), which assumes pixels: in other units, pass 1 px
+in those units.)doc",
         py::arg("correspondences"),
         py::arg("w1"),
         py::arg("h1"),
@@ -606,10 +610,11 @@ units, pass 1 px in those units.)doc",
 Returns (line, inlier mask); line is None on failure.
 
 sigma_th: the inlier threshold, in pixels: the largest residual of an inlier
-(MAGSAC++'s noise scale sigma_max is sigma_th / 3.64).
-reference_th: a threshold, in pixels, for the inliers counted to set the number
-of iterations. None (default): min(sigma_th, 1), which assumes pixels: in other
-units, pass 1 px in those units.)doc",
+(MAGSAC++'s score takes the noise scale sigma_max as sigma_th / 3.64).
+reference_th: a threshold, in pixels, for the inliers counted to skip the models
+that can't beat the best one and, for MAGSAC++, to set the number of iterations.
+None (default): min(sigma_th, 1), which assumes pixels: in other units, pass 1 px
+in those units.)doc",
         py::arg("points"),
         py::arg("w1"),
         py::arg("h1"),
