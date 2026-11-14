@@ -74,6 +74,22 @@ def angle_between_normals(n1, n2):
     return np.degrees(np.arccos(cos_angle))
 
 
+def check_plane(plane, mask, normal, offset, n_inliers):
+    """Checks the plane against normal . x + offset = 0 (up to sign), and the inlier mask.
+    Tolerances: about five times the largest errors over 300 runs of each test."""
+    assert plane is not None, "Plane fitting failed"
+    normal = np.asarray(normal, dtype=np.float64) / np.linalg.norm(normal)
+    assert abs(np.linalg.norm(plane[:3]) - 1) < 1e-9, "The normal is not a unit vector"
+    angle_err = angle_between_normals(normal, plane[:3])
+    assert angle_err < 0.1, f"Normal angle error {angle_err:.4f} degrees"
+    sign = np.sign(np.dot(normal, plane[:3]))
+    offset_err = abs(sign * plane[3] - offset)
+    assert offset_err < 0.005, f"Offset error {offset_err:.5f}"
+    assert mask[:n_inliers].sum() >= 0.95 * n_inliers, f"Only {mask[:n_inliers].sum()} inliers found"
+    n_outliers = len(mask) - n_inliers
+    assert mask[n_inliers:].sum() <= 0.05 * n_outliers, f"{mask[n_inliers:].sum()} outliers accepted"
+
+
 @pytest.mark.parametrize("use_magsac_plus_plus", [True, False])
 def test_plane_fitting_basic(use_magsac_plus_plus):
     """Test plane fitting with a simple horizontal plane z=5."""
@@ -89,17 +105,7 @@ def test_plane_fitting_basic(use_magsac_plus_plus):
         sigma_th=0.1,
         use_magsac_plus_plus=use_magsac_plus_plus,
     )
-
-    assert plane is not None, "Plane fitting failed"
-
-    # Check normal direction (up to sign)
-    est_normal = plane[:3]
-    angle_err = angle_between_normals(gt_normal, est_normal)
-    assert angle_err < 2.0, f"Normal angle error {angle_err:.2f} degrees"
-
-    # Check that most inliers are found
-    n_inliers_found = np.sum(mask)
-    assert n_inliers_found > 150, f"Only {n_inliers_found} inliers found"
+    check_plane(plane, mask, gt_normal, gt_offset, 200)
 
 
 @pytest.mark.parametrize(
@@ -118,12 +124,7 @@ def test_plane_fitting_orientations(normal):
     )
 
     plane, mask = verify_plane(points, sigma_th=0.05)
-
-    assert plane is not None, "Plane fitting failed"
-
-    est_normal = plane[:3]
-    angle_err = angle_between_normals(normal, est_normal)
-    assert angle_err < 2.0, f"Normal angle error {angle_err:.2f} degrees"
+    check_plane(plane, mask, normal, 3.0, 300)
 
 
 def test_plane_fitting_high_outlier_ratio():
@@ -134,16 +135,29 @@ def test_plane_fitting_high_outlier_ratio():
     )
 
     plane, mask = verify_plane(points, sigma_th=0.1, max_iters=10000)
+    check_plane(plane, mask, gt_normal, 0.0, 200)
 
-    assert plane is not None, "Plane fitting failed with 50% outliers"
 
-    est_normal = plane[:3]
-    angle_err = angle_between_normals(gt_normal, est_normal)
-    assert angle_err < 3.0, f"Normal angle error {angle_err:.2f} degrees"
+@pytest.mark.parametrize("sampler", [1, 3, 4])
+def test_plane_fitting_samplers(sampler):
+    """PROSAC (rows sorted by quality), NG-RANSAC and AR-Sampler, with one probability per row."""
+    points, gt_mask = generate_plane_data([0.3, -0.7, 0.5], offset=3.0, n_inliers=300, n_outliers=100, noise_std=0.005)
+    probabilities = np.where(gt_mask, 0.9, 0.1)
+    plane, mask = pymagsac.findPlane3D(points, probabilities, sampler=sampler, sigma_th=0.05, min_iters=500, max_iters=5000)
+    check_plane(plane, mask, [0.3, -0.7, 0.5], 3.0, 300)
 
 
 def test_plane_fitting_insufficient_points():
     """Test that plane fitting raises with fewer than 3 points."""
     points = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         verify_plane(points)
+
+
+@pytest.mark.parametrize("sampler, probabilities", [
+    (3, []), (4, []), (3, [0.5] * 10), (4, np.zeros(20))])
+def test_plane_fitting_invalid_probabilities(sampler, probabilities):
+    """Samplers 3 and 4 need one probability per row (and, for 4, a positive one)."""
+    points = np.random.default_rng(0).uniform(-1, 1, (20, 3))
+    with pytest.raises(ValueError):
+        pymagsac.findPlane3D(points, probabilities, sampler=sampler)
