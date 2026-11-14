@@ -452,6 +452,10 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensus(
 	// Sort the residuals in ascending order
 	std::sort(all_residuals.begin(), all_residuals.end(), comparator);
 
+	// No point is closer to the model than the maximum threshold.
+	if (all_residuals.empty())
+		return false;
+
 	// The maximum threshold is set to be slightly bigger than the distance of the
 	// farthest possible inlier.
 	current_maximum_sigma =
