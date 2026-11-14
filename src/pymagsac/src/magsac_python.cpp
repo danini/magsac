@@ -16,6 +16,7 @@
 #include "samplers/importance_sampler.h"
 #include "samplers/adaptive_reordering_sampler.h"
 
+#include <memory>
 #include <thread>
 
 #include <gflags/gflags.h>
