@@ -1,10 +1,11 @@
+#include <optional>
 #include <string>
 #include <vector>
 #include <opencv2/core/core.hpp>
 
-// Make RANSAC sampling reproducible when seed >= 0, else restore the default
-// nondeterministic behavior. Implemented in magsac_python.cpp.
-void applyMagsacSeed(int seed);
+// Seeds the random generators of the next estimation, or, without a seed,
+// restores the default seeding from std::random_device.
+void applyMagsacSeed(std::optional<unsigned int> seed);
 
 int adaptiveInlierSelection_(
     const std::vector<double>& srcPts_,

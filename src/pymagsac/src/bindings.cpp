@@ -1,12 +1,12 @@
 #include <stdexcept>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 #include <pybind11/stl_bind.h>
 #include <pybind11/numpy.h>
 #include "magsac_python.hpp"
 
 
 namespace py = pybind11;
-
 
 py::tuple adaptiveInlierSelection(
     py::array_t<double>  x1y1_,
@@ -91,7 +91,7 @@ py::tuple findRigidTransformation(
     int min_iters,
     int max_iters,
     int partition_num,
-    int seed)
+    std::optional<unsigned int> seed)
 {
 	py::buffer_info buf1 = correspondences_.request();
 	size_t NUM_TENTS = buf1.shape[0];
@@ -163,7 +163,7 @@ py::tuple findFundamentalMatrix(
     int min_iters,
     int max_iters,
     int partition_num,
-    int seed)
+    std::optional<unsigned int> seed)
 {
 	py::buffer_info buf1 = correspondences_.request();
 	size_t NUM_TENTS = buf1.shape[0];
@@ -241,7 +241,7 @@ py::tuple findEssentialMatrix(
     int min_iters,
     int max_iters,
     int partition_num,
-    int seed) 
+    std::optional<unsigned int> seed) 
 {
 	py::buffer_info buf1 = correspondences_.request();
 	size_t NUM_TENTS = buf1.shape[0];
@@ -341,7 +341,7 @@ py::tuple findLine2D(
     int min_iters,
     int max_iters,
     int partition_num,
-    int seed) 
+    std::optional<unsigned int> seed) 
 {
     py::buffer_info buf1 = points_.request();
 	size_t NUM_TENTS = buf1.shape[0];
@@ -415,7 +415,7 @@ py::tuple findHomography(
     int min_iters,
     int max_iters,
     int partition_num,
-    int seed) 
+    std::optional<unsigned int> seed) 
 {
 	py::buffer_info buf1 = correspondences_.request();
 	size_t NUM_TENTS = buf1.shape[0];
@@ -518,7 +518,7 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
         py::arg("partition_num") = 5,
-        py::arg("seed") = -1);
+        py::arg("seed") = py::none());
 
     m.def("findFundamentalMatrix", &findFundamentalMatrix, R"doc(some doc)doc",
         py::arg("correspondences"),
@@ -534,7 +534,7 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
         py::arg("partition_num") = 5,
-        py::arg("seed") = -1);
+        py::arg("seed") = py::none());
 
     m.def("findRigidTransformation", &findRigidTransformation, R"doc(some doc)doc",
         py::arg("correspondences"),
@@ -546,7 +546,7 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
         py::arg("partition_num") = 5,
-        py::arg("seed") = -1);
+        py::arg("seed") = py::none());
 
   m.def("findHomography", &findHomography, R"doc(some doc)doc",
         py::arg("correspondences"),
@@ -562,7 +562,7 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
         py::arg("partition_num") = 5,
-        py::arg("seed") = -1); 
+        py::arg("seed") = py::none()); 
 
   m.def("findLine2D", &findLine2D, R"doc(some doc)doc",
         py::arg("points"),
@@ -576,7 +576,7 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
         py::arg("partition_num") = 5,
-        py::arg("seed") = -1); 
+        py::arg("seed") = py::none()); 
 
 
   return m.ptr();

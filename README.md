@@ -72,6 +72,16 @@ or
 pip3 install -e .
 ```
 
+# Reproducible results
+
+The Python estimators (`findHomography`, `findFundamentalMatrix`, `findEssentialMatrix`, `findRigidTransformation`, `findLine2D`) draw random samples. To get the same result every time, pass a seed, a non-negative integer:
+
+```python
+H, mask = pymagsac.findHomography(correspondences, w1, h1, w2, h2, probabilities, seed=42)
+```
+
+The same seed, data and parameters give the same result on the same platform (the random distributions of the C++ standard library differ between compilers). Without a seed (`seed=None`, the default), the samplers are seeded from `std::random_device`, as before. A seed also calls `std::srand`, which is shared by the whole process.
+
 # Example project
 
 To build the sample project showing examples of fundamental matrix, homography and essential matrix fitting, set variable `CREATE_SAMPLE_PROJECT = ON` when creating the project in CMAKE. 
