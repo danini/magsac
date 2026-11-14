@@ -7,6 +7,18 @@
 
 namespace py = pybind11;
 
+// The optional reference_th argument: None gives the default (a value <= 0 for
+// the C++ functions).
+static double referenceThreshold(const py::object &reference_th)
+{
+    if (reference_th.is_none())
+        return -1.0;
+    const double threshold = reference_th.cast<double>();
+    if (!(threshold > 0))
+        throw std::invalid_argument("reference_th should be positive, or None");
+    return threshold;
+}
+
 py::tuple adaptiveInlierSelection(
     py::array_t<double>  x1y1_,
     py::array_t<double>  x2y2_,
@@ -89,7 +101,8 @@ py::tuple findRigidTransformation(
     double conf,
     int min_iters,
     int max_iters,
-    int partition_num)
+    int partition_num,
+    py::object reference_th)
 {
 	py::buffer_info buf1 = correspondences_.request();
 	size_t NUM_TENTS = buf1.shape[0];
@@ -128,7 +141,8 @@ py::tuple findRigidTransformation(
         conf,
         min_iters,
         max_iters,
-        partition_num);
+        partition_num,
+        referenceThreshold(reference_th));
 
     py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
     py::buffer_info buf3 = inliers_.request();
@@ -159,7 +173,8 @@ py::tuple findFundamentalMatrix(
     double conf,
     int min_iters,
     int max_iters,
-    int partition_num)
+    int partition_num,
+    py::object reference_th)
 {
 	py::buffer_info buf1 = correspondences_.request();
 	size_t NUM_TENTS = buf1.shape[0];
@@ -202,7 +217,8 @@ py::tuple findFundamentalMatrix(
         conf,
         min_iters,
         max_iters,
-        partition_num);
+        partition_num,
+        referenceThreshold(reference_th));
 
     py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
     py::buffer_info buf3 = inliers_.request();
@@ -235,7 +251,8 @@ py::tuple findEssentialMatrix(
     double conf,
     int min_iters,
     int max_iters,
-    int partition_num) 
+    int partition_num,
+    py::object reference_th)
 {
 	py::buffer_info buf1 = correspondences_.request();
 	size_t NUM_TENTS = buf1.shape[0];
@@ -302,7 +319,8 @@ py::tuple findEssentialMatrix(
         conf,
         min_iters,
         max_iters,
-        partition_num);
+        partition_num,
+        referenceThreshold(reference_th));
 
     py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
     py::buffer_info buf3 = inliers_.request();
@@ -333,7 +351,8 @@ py::tuple findLine2D(
     double conf,
     int min_iters,
     int max_iters,
-    int partition_num) 
+    int partition_num,
+    py::object reference_th)
 {
     py::buffer_info buf1 = points_.request();
 	size_t NUM_TENTS = buf1.shape[0];
@@ -372,7 +391,8 @@ py::tuple findLine2D(
         conf,
         min_iters,
         max_iters,
-        partition_num);
+        partition_num,
+        referenceThreshold(reference_th));
     
     py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
     py::buffer_info buf3 = inliers_.request();
@@ -405,7 +425,8 @@ py::tuple findHomography(
     double conf,
     int min_iters,
     int max_iters,
-    int partition_num) 
+    int partition_num,
+    py::object reference_th)
 {
 	py::buffer_info buf1 = correspondences_.request();
 	size_t NUM_TENTS = buf1.shape[0];
@@ -448,7 +469,8 @@ py::tuple findHomography(
                     conf,
                     min_iters,
                     max_iters,
-                    partition_num);
+                    partition_num,
+        referenceThreshold(reference_th));
     
     py::array_t<bool> inliers_ = py::array_t<bool>(NUM_TENTS);
     py::buffer_info buf3 = inliers_.request();
@@ -491,7 +513,13 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("problemType"),
         py::arg("minimumInlierNumber") = 20);
 
-    m.def("findEssentialMatrix", &findEssentialMatrix, R"doc(some doc)doc",
+    m.def("findEssentialMatrix", &findEssentialMatrix, R"doc(Estimates an essential matrix with MAGSAC or MAGSAC++.
+Returns (E, inlier mask); E is None on failure.
+
+sigma_th: the inlier threshold, in pixels: the largest residual of an inlier
+(MAGSAC++'s noise scale sigma_max is sigma_th / 3.64).
+reference_th: a threshold, in pixels, for the inliers counted to set the number
+of iterations, and of the symmetric epipolar check of the models. None (default): min(sigma_th, 1).)doc",
         py::arg("correspondences"),
         py::arg("K1"),
         py::arg("K2"),
@@ -506,9 +534,16 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("conf") = 0.99,
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5);
+        py::arg("partition_num") = 5,
+        py::arg("reference_th") = py::none());
 
-    m.def("findFundamentalMatrix", &findFundamentalMatrix, R"doc(some doc)doc",
+    m.def("findFundamentalMatrix", &findFundamentalMatrix, R"doc(Estimates a fundamental matrix with MAGSAC or MAGSAC++.
+Returns (F, inlier mask); F is None on failure.
+
+sigma_th: the inlier threshold, in pixels: the largest residual of an inlier
+(MAGSAC++'s noise scale sigma_max is sigma_th / 3.64).
+reference_th: a threshold, in pixels, for the inliers counted to set the number
+of iterations, and of the symmetric epipolar check of the models. None (default): min(sigma_th, 1).)doc",
         py::arg("correspondences"),
         py::arg("w1"),
         py::arg("h1"),
@@ -521,9 +556,16 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("conf") = 0.99,
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5);
+        py::arg("partition_num") = 5,
+        py::arg("reference_th") = py::none());
 
-    m.def("findRigidTransformation", &findRigidTransformation, R"doc(some doc)doc",
+    m.def("findRigidTransformation", &findRigidTransformation, R"doc(Estimates a rigid transformation with MAGSAC or MAGSAC++.
+Returns (T, inlier mask); T is None on failure.
+
+sigma_th: the inlier threshold, in the data's units: the largest residual of an
+inlier (MAGSAC++'s noise scale sigma_max is sigma_th / 3.64).
+reference_th: a threshold, in the data's units, for the inliers counted to set
+the number of iterations, and of the check of the models. None (default): sigma_th.)doc",
         py::arg("correspondences"),
         py::arg("probabilities"),
 		py::arg("sampler") = 4,
@@ -532,9 +574,16 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("conf") = 0.99,
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5);
+        py::arg("partition_num") = 5,
+        py::arg("reference_th") = py::none());
 
-  m.def("findHomography", &findHomography, R"doc(some doc)doc",
+  m.def("findHomography", &findHomography, R"doc(Estimates a homography with MAGSAC or MAGSAC++.
+Returns (H, inlier mask); H is None on failure.
+
+sigma_th: the inlier threshold, in pixels: the largest residual of an inlier
+(MAGSAC++'s noise scale sigma_max is sigma_th / 3.64).
+reference_th: a threshold, in pixels, for the inliers counted to set the number
+of iterations. None (default): min(sigma_th, 1).)doc",
         py::arg("correspondences"),
         py::arg("w1"),
         py::arg("h1"),
@@ -547,9 +596,16 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("conf") = 0.99,
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5); 
+        py::arg("partition_num") = 5,
+        py::arg("reference_th") = py::none()); 
 
-  m.def("findLine2D", &findLine2D, R"doc(some doc)doc",
+  m.def("findLine2D", &findLine2D, R"doc(Estimates a 2D line with MAGSAC or MAGSAC++.
+Returns (line, inlier mask); line is None on failure.
+
+sigma_th: the inlier threshold, in the data's units: the largest residual of an
+inlier (MAGSAC++'s noise scale sigma_max is sigma_th / 3.64).
+reference_th: a threshold, in the data's units, for the inliers counted to set
+the number of iterations. None (default): sigma_th.)doc",
         py::arg("points"),
         py::arg("w1"),
         py::arg("h1"),
@@ -560,7 +616,8 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("conf") = 0.99,
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
-        py::arg("partition_num") = 5); 
+        py::arg("partition_num") = 5,
+        py::arg("reference_th") = py::none()); 
 
 
   return m.ptr();
