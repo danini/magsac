@@ -16,6 +16,7 @@
 #include "samplers/importance_sampler.h"
 #include "samplers/adaptive_reordering_sampler.h"
 
+#include <memory>
 #include <thread>
 
 #include <gflags/gflags.h>
@@ -37,13 +38,13 @@ int findRigidTransformation_(
     magsac::utils::DefaultRigidTransformationEstimator estimator; // The robust rigid transformation estimator class containing the
     gcransac::RigidTransformation model; // The estimated model
 
-    MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>* magsac;
+    std::unique_ptr<MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>> magsac;
     if (use_magsac_plus_plus)
-        magsac = new MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>(
-            MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>::MAGSAC_PLUS_PLUS);
+        magsac.reset(new MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>(
+            MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>::MAGSAC_PLUS_PLUS));
     else
-        magsac = new MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>(
-            MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>::MAGSAC_ORIGINAL);
+        magsac.reset(new MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>(
+            MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>::MAGSAC_ORIGINAL));
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
@@ -172,13 +173,13 @@ int findFundamentalMatrix_(
     magsac::utils::DefaultFundamentalMatrixEstimator estimator(0.1); // The robust homography estimator class containing the
     gcransac::FundamentalMatrix model; // The estimated model
 
-    MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>* magsac;
+    std::unique_ptr<MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>> magsac;
     if (use_magsac_plus_plus)
-        magsac = new MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>(
-            MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>::MAGSAC_PLUS_PLUS);
+        magsac.reset(new MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>(
+            MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>::MAGSAC_PLUS_PLUS));
     else
-        magsac = new MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>(
-            MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>::MAGSAC_ORIGINAL);
+        magsac.reset(new MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>(
+            MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>::MAGSAC_ORIGINAL));
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
@@ -490,13 +491,13 @@ int findLine2D_(std::vector<double>& pointsArr,
     magsac::utils::Default2DLineEstimator estimator; // The robust homography estimator class containing the function for the fitting and residual calculation
     gcransac::Homography model; // The estimated model
 
-    MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>* magsac;
+    std::unique_ptr<MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>> magsac;
     if (use_magsac_plus_plus)
-        magsac = new MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>(
-            MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>::MAGSAC_PLUS_PLUS);
+        magsac.reset(new MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>(
+            MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>::MAGSAC_PLUS_PLUS));
     else
-        magsac = new MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>(
-            MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>::MAGSAC_ORIGINAL);
+        magsac.reset(new MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>(
+            MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>::MAGSAC_ORIGINAL));
 
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
@@ -610,13 +611,13 @@ int findHomography_(std::vector<double>& correspondences,
     magsac::utils::DefaultHomographyEstimator estimator; // The robust homography estimator class containing the function for the fitting and residual calculation
     gcransac::Homography model; // The estimated model
 
-    MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>* magsac;
+    std::unique_ptr<MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>> magsac;
     if (use_magsac_plus_plus)
-        magsac = new MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>(
-            MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>::MAGSAC_PLUS_PLUS);
+        magsac.reset(new MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>(
+            MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>::MAGSAC_PLUS_PLUS));
     else
-        magsac = new MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>(
-            MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>::MAGSAC_ORIGINAL);
+        magsac.reset(new MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>(
+            MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>::MAGSAC_ORIGINAL));
 
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
