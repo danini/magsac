@@ -1,271 +1,167 @@
 #!/usr/bin/env python3
-"""MAGSAC++ benchmark runner (synthetic ground truth + real datasets).
+"""Accuracy benchmark for pymagsac, on synthetic data or on the scenes in data/.
 
-Estimators/backends are resolved at runtime, so the same command runs on the
-upstream `master` build and on builds that add estimators (e.g. pip-installable's
-findPlane3D). Unavailable ones are detected and skipped.
+Synthetic data (default): for each task, inlier noise and outlier ratio, the
+estimator runs on several random problems; the same problems are generated on
+every run, so two builds can be compared on identical data. Columns (medians over
+the problems):
+  err      RMSE of the estimated model's residual on the noisy inliers (pixels)
+  gt_err   the same on the noise-free inliers: the distance to the true model
+  F1       F1 score of the returned inlier mask against the true inliers
+  fail     fraction of problems where no model was returned
+  time_ms  run time of the estimator
 
-Per problem we report, over the TRUE inliers, the median residual of the estimated
-model (`err`), the inlier-mask `F1`, the no-model failure fraction (`none`), the
-median wall-clock `time_ms`, and (synthetic only) `gt_err` — the error of the
-estimated model vs the synthetic ground-truth model (SGD for F, reprojection for
-H, normal angle for line/plane), mirroring the paper's metrics.
-
-Backends (`--backend`):
-  magsac++   pymagsac, use_magsac_plus_plus=True   (default)
-  magsac     pymagsac, use_magsac_plus_plus=False  (the MAGSAC baseline)
-  cv2:NAME   OpenCV cv2.find{FundamentalMat,Homography} with method=cv2.NAME,
-             e.g. cv2:RANSAC, cv2:LMEDS, cv2:USAC_MAGSAC, cv2:USAC_ACCURATE
-             (the paper's RANSAC/LMedS/… baselines; needs opencv-python; F/H only)
-  py:MODULE  any pymagsac-compatible pure-python module (e.g. py:garfield_sfm.magsac),
-             imported via importlib; MAGSAC++ mode. Use --seed for reproducible A/B.
+Real data (--data DIR, with --task fundamental or homography): every
+'<scene>_pts.txt' in DIR: data/fundamental_matrix, data/homography (the homogr
+dataset) or data/homography/extremeview (EVD). `err` is then the RMSE over the
+annotated inliers, as in examples/cpp_example.cpp, and the medians are over runs.
 
 Examples
-  python run_benchmark.py --task all --quick
-  python run_benchmark.py --task fundamental --backend cv2:RANSAC --out ransac.csv
-  python run_benchmark.py --task fundamental --backend magsac++   --out mpp.csv
-  python run_benchmark.py --compare ransac.csv mpp.csv
-  python run_benchmark.py --task homography --sweep-sigma 0.5,1,2,3,5,8,12,20   # threshold sensitivity
-  python run_benchmark.py --task fundamental --coherent --sampler 2             # P-NAPSAC on clustered inliers
-  python run_benchmark.py --task fundamental --data DIR
+  python run_benchmark.py --quick
+  python run_benchmark.py --task homography --data ../data/homography/extremeview
+  python run_benchmark.py --out a.csv            # with one build of pymagsac
+  python run_benchmark.py --out b.csv            # with another
+  python run_benchmark.py --compare a.csv b.csv  # differences, B minus A
 """
 import argparse
 import csv
-import os
-import sys
 import time
 import numpy as np
+import pymagsac
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import datasets
 import synthetic as syn
-import datasets as ds
 
-W = syn.W
-METRICS = {"err", "gt_err", "F1", "inliers", "none", "time_ms"}
-
-# task -> (pymagsac fn, generator, residual metric, GT-model metric)
-# essential has no synthetic generator (real-data only); its residual/SGD reuse the
-# fundamental ones since _run converts the estimated E to a pixel-space F = K2^-T E K1^-1.
+# task -> (estimator, generator, residual)
 TASKS = {
-    "fundamental": ("findFundamentalMatrix", syn.gen_fundamental, syn.sampson,      syn.sgd),
-    "homography":  ("findHomography",        syn.gen_homography,  syn.transfer_err, syn.h_model_err),
-    "line2d":      ("findLine2D",            syn.gen_line2d,      syn.line_err,     syn.normal_angle),
-    "plane3d":     ("findPlane3D",           syn.gen_plane3d,     syn.plane_err,    syn.normal_angle),
-    "essential":   ("findEssentialMatrix",   None,                syn.sampson,      syn.sgd),
+    "fundamental": (pymagsac.findFundamentalMatrix, syn.gen_fundamental, syn.sampson),
+    "homography": (pymagsac.findHomography, syn.gen_homography, syn.transfer),
 }
-DATA_TASKS = {"fundamental", "homography", "essential"}   # have real-dataset loaders
-CV2_TASKS = {"fundamental", "homography"}    # OpenCV exposes these (essential needs K -> skip)
+# Maximum sigma used for the scenes of data/ by examples/cpp_example.cpp.
+REAL_SIGMA = {"fundamental": 5.0, "homography": 50.0}
+METRICS = ["err", "gt_err", "F1", "fail", "time_ms"]
 
 
-def backend_ok(task, backend):
-    if backend.startswith("cv2:"):
-        if task not in CV2_TASKS:
-            return False, f"{task}: OpenCV backend supports only {sorted(CV2_TASKS)}"
-        try:
-            import cv2
-        except ImportError:
-            return False, "OpenCV (cv2) not installed — `pip install opencv-python`"
-        if not hasattr(cv2, backend[4:]):
-            return False, f"cv2 has no method '{backend[4:]}'"
-        return True, ""
-    if backend.startswith("py:"):
-        import importlib
-        try:
-            _m = importlib.import_module(backend[3:])
-        except Exception as e:
-            return False, f"module '{backend[3:]}' not importable ({e})"
-        fn = TASKS[task][0]
-        return (hasattr(_m, fn), f"{task}: '{fn}' not in {backend[3:]}")
-    import pymagsac
-    fn = TASKS[task][0]
-    return (hasattr(pymagsac, fn), f"{task}: '{fn}' not in this pymagsac build")
+def estimate(task, data, args, sigma):
+    """Runs pymagsac; returns (model or None, inlier mask, time in ms)."""
+    options = dict(sampler=args.sampler, use_magsac_plus_plus=not args.magsac,
+                   sigma_th=sigma, conf=0.99, min_iters=50, max_iters=args.max_iters)
+    # Image sizes are only used by the P-NAPSAC and AR samplers' grids.
+    size = np.ceil(data.max(axis=0)) + 1
+    start = time.perf_counter()
+    model, mask = TASKS[task][0](data, *size, np.array([]), **options)
+    ms = (time.perf_counter() - start) * 1e3
+    if model is None:
+        return None, None, ms
+    return np.asarray(model, float).reshape(3, 3), np.asarray(mask, bool), ms
 
 
-def _run(task, data, sigma, backend, sampler, meta=None, seed=-1):
-    if backend.startswith("cv2:"):
-        import cv2
-        m = getattr(cv2, backend[4:])
-        p1 = np.ascontiguousarray(data[:, :2]); p2 = np.ascontiguousarray(data[:, 2:4])
-        if task == "fundamental":
-            M, mask = cv2.findFundamentalMat(p1, p2, m, sigma, 0.99)
-        else:
-            M, mask = cv2.findHomography(p1, p2, m, sigma)
-        if M is None or mask is None or M.shape[0] < 3:
-            return None, None
-        return np.asarray(M[:3], float), np.asarray(mask, bool).ravel()
-    if backend.startswith("py:"):                       # pymagsac-compatible pure-python module
-        import importlib
-        _m = importlib.import_module(backend[3:]); mpp = True
-    else:
-        import pymagsac as _m
-        mpp = backend != "magsac"
-    fn = getattr(_m, TASKS[task][0])
-    common = dict(sampler=sampler, use_magsac_plus_plus=mpp, sigma_th=sigma,
-                  conf=0.99, min_iters=50, max_iters=1000, seed=seed)
-    if task == "essential":
-        K1, K2 = meta["K1"], meta["K2"]; w1, h1, w2, h2 = meta["dims"]
-        E, mask = fn(data, K1, K2, w1, h1, w2, h2, np.array([]), **common)  # K-normalized internally
-        E = np.asarray(E, float)
-        if E.size < 9:
-            return None, None
-        F = np.linalg.inv(K2).T @ E.reshape(3, 3) @ np.linalg.inv(K1)  # pixel-space equivalent
-        return F, np.asarray(mask, bool)
-    if task in ("fundamental", "homography"):
-        w1, h1, w2, h2 = meta["dims"] if (meta and meta.get("dims")) else (W, W, W, W)
-        M, mask = fn(data, w1, h1, w2, h2, np.array([]), **common); need = 9
-    elif task == "line2d":
-        M, mask = fn(data, W, W, np.array([]), **common); need = 3
-    else:  # plane3d
-        M, mask = fn(data, np.array([]), **common); need = 4
-    M = np.asarray(M, float)
-    if M.size < need:
-        return None, None
-    return (M.reshape(3, 3) if need == 9 else M), np.asarray(mask, bool)
+def summarize(rows):
+    def median(key):
+        values = [r[key] for r in rows if r[key] is not None]
+        return round(float(np.median(values)), 4) if values else float("nan")
+    out = {m: median(m) for m in ("err", "gt_err", "F1", "time_ms") if m in rows[0]}
+    out["fail"] = round(sum(r["err"] is None for r in rows) / len(rows), 3)
+    return out
 
 
-def _eval(task, data, tmask, model):
-    # RMSE of the model's point-to-model residual over the GT inliers (as in the
-    # repo's cpp_example.cpp: rmse = sqrt(mean(squaredResidual over GT inliers))).
-    r = TASKS[task][2](data[tmask], model)
-    return float(np.sqrt(np.mean(np.square(r))))
+def run_synthetic(task, args):
+    _, generate, residual = TASKS[task]
+    sigma = 3.0 if args.sigma is None else args.sigma
+    noises = [1.0] if args.quick else [0.5, 1.0, 2.0]
+    ratios = [0.0, 0.5] if args.quick else [0.0, 0.3, 0.5, 0.7]
+    for noise in noises:
+        for ratio in ratios:
+            runs = []
+            for seed in range(args.runs):
+                rng = np.random.default_rng(seed)
+                data, clean = generate(rng, args.inliers, ratio, noise)
+                true = np.arange(len(data)) < len(clean)
+                model, mask, ms = estimate(task, data, args, sigma)
+                ok = model is not None
+                runs.append({"err": syn.rmse(residual(data[true], model)) if ok else None,
+                             "gt_err": syn.rmse(residual(clean, model)) if ok else None,
+                             "F1": syn.f1(mask, true) if ok else None, "time_ms": ms})
+            yield {"task": task, "noise": noise, "outliers": ratio, **summarize(runs)}
 
 
-def _trial(task, gen, n, noise, o, sigma, backend, sampler, coherent, n_seeds):
-    errs, gts, f1s, times, none = [], [], [], [], 0
-    for s in range(n_seeds):
-        data, tmask, gt = gen(n, o, noise, seed=s, coherent=coherent)
-        t0 = time.perf_counter()
-        model, emask = _run(task, data, sigma, backend, sampler, seed=s)
-        times.append((time.perf_counter() - t0) * 1e3)
-        if model is None:
-            none += 1; continue
-        errs.append(_eval(task, data, tmask, model))
-        gts.append(float(TASKS[task][3](model, gt)))
-        f1s.append(syn.f1(emask, tmask))
-    med = lambda a: round(float(np.median(a)), 4) if a else float("nan")
-    return {"err": med(errs), "gt_err": med(gts), "F1": med(f1s),
-            "none": round(none / n_seeds, 3), "time_ms": round(float(np.median(times)), 2)}
+def run_real(task, args):
+    sigma = REAL_SIGMA[task] if args.sigma is None else args.sigma
+    residual = TASKS[task][2]
+    for name, data, true in datasets.iter_scenes(args.data):
+        runs = []
+        for _ in range(args.runs):
+            model, _, ms = estimate(task, data, args, sigma)
+            err = syn.rmse(residual(data[true], model)) if model is not None else None
+            runs.append({"err": err, "time_ms": ms})
+        yield {"task": task, "scene": name, **summarize(runs)}
 
 
-def run_synthetic(task, quick, sigma, backend, sampler, coherent):
-    gen = TASKS[task][1]
-    ns = [200] if quick else [200, 1000]
-    noises = [1.0] if quick else [0.5, 1.0, 2.0]
-    outs = [0.0, 0.5] if quick else [0.0, 0.3, 0.5, 0.7]
-    n_seeds = 3 if quick else 5
-    for n in ns:
-        for noise in noises:
-            for o in outs:
-                row = {"n": n, "noise": noise, "out": o}
-                row.update(_trial(task, gen, n, noise, o, sigma, backend, sampler, coherent, n_seeds))
-                yield row
+def print_rows(rows):
+    keys = [k for k in rows[0] if k not in METRICS]
+    metrics = [m for m in METRICS if m in rows[0]]
+    print(" ".join(f"{k:>18}" for k in keys) + " | " + " ".join(f"{m:>8}" for m in metrics))
+    for r in rows:
+        print(" ".join(f"{r[k]!s:>18}" for k in keys) + " | "
+              + " ".join(f"{r[m]:>8}" for m in metrics))
 
 
-def run_sweep_sigma(task, sigmas, backend, sampler, coherent, n=500, noise=1.0, o=0.5, n_seeds=5):
-    gen = TASKS[task][1]
-    for sg in sigmas:
-        row = {"sigma": sg}
-        row.update(_trial(task, gen, n, noise, o, sg, backend, sampler, coherent, n_seeds))
-        yield row
-
-
-def run_data(task, root, gt_thresh, sigma, backend, sampler, seed=-1):
-    for rec in ds.iter_datasets(root, task, gt_thresh):
-        name, data, tmask = rec[0], rec[1], rec[2]
-        meta = rec[3] if len(rec) > 3 else None
-        t0 = time.perf_counter()
-        model, emask = _run(task, data, sigma, backend, sampler, meta, seed)
-        dt = (time.perf_counter() - t0) * 1e3
-        if task == "essential":          # no GT in the data (like cpp_example): inlier ratio only
-            inl = round(float(emask.mean()), 4) if model is not None else float("nan")
-            yield {"name": name, "inliers": inl, "none": float(model is None), "time_ms": round(dt, 2)}
-            continue
-        if model is None or not tmask.any():
-            yield {"name": name, "err": float("nan"), "F1": float("nan"),
-                   "none": 1.0, "time_ms": round(dt, 2)}; continue
-        row = {"name": name, "err": round(_eval(task, data, tmask, model), 4),  # RMSE over GT inliers
-               "F1": round(syn.f1(emask, tmask), 4), "none": 0.0, "time_ms": round(dt, 2)}
-        if meta and meta.get("gt_model") is not None:           # error vs the GT homography
-            w, h = meta["dims"][0], meta["dims"][1]
-            row["gt_err"] = round(float(syn.h_model_err(model, meta["gt_model"], W=w, H=h)), 4)
-        yield row
-
-
-def compare(a_path, b_path):
-    def load(p):
-        with open(p) as f:
-            r = csv.DictReader(f); keys = [c for c in r.fieldnames if c not in METRICS]
-            return keys, [c for c in r.fieldnames if c in METRICS], \
-                {tuple(row[k] for k in keys): row for row in r}
-    (ka, ma, A), (_, _, B) = load(a_path), load(b_path)
-    print(f"A={a_path}  B={b_path}   (d* = B - A; d_err/d_gt_err<0, d_F1>0 = B better)")
-    cols = [m for m in ("err", "gt_err", "F1", "inliers", "none", "time_ms") if m in ma]
-    print(f"{'/'.join(ka):>24} | " + " ".join(f"d_{m:>7}" for m in cols))
-    print("-" * (26 + 10 * len(cols)))
-    for k in sorted(A.keys() & B.keys()):
-        a, b = A[k], B[k]
-        def d(m):
-            try: return f"{float(b[m]) - float(a[m]):>9.3f}"
-            except (ValueError, KeyError): return f"{'':>9}"
-        print(f"{'/'.join(map(str, k)):>24} | " + " ".join(d(m) for m in cols))
+def compare(path_a, path_b):
+    def load(path):
+        with open(path) as f:
+            rows = list(csv.DictReader(f))
+        keys = [k for k in rows[0] if k not in METRICS]
+        return keys, {tuple(r[k] for k in keys): r for r in rows}
+    keys, a = load(path_a)
+    _, b = load(path_b)
+    metrics = [m for m in METRICS if m in next(iter(a.values()))]
+    print(f"B - A, with A = {path_a} and B = {path_b} (lower err is better)")
+    print(" ".join(f"{k:>18}" for k in keys) + " | " + " ".join(f"{m:>8}" for m in metrics))
+    for k in sorted(a.keys() & b.keys()):
+        diffs = []
+        for m in metrics:
+            try:
+                diffs.append(f"{float(b[k][m]) - float(a[k][m]):>8.3f}")
+            except ValueError:
+                diffs.append(f"{'':>8}")
+        print(" ".join(f"{v:>18}" for v in k) + " | " + " ".join(diffs))
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--task", choices=list(TASKS) + ["all"], default="fundamental")
-    ap.add_argument("--backend", default="magsac++", help="magsac++ | magsac | cv2:NAME")
-    ap.add_argument("--quick", action="store_true")
-    ap.add_argument("--coherent", action="store_true", help="spatially clustered inliers")
-    ap.add_argument("--sampler", type=int, default=0, help="0=uniform 1=PROSAC 2=P-NAPSAC 3=importance 4=AR")
-    ap.add_argument("--sweep-sigma", default=None, help="comma list of sigma_th to sweep (threshold sensitivity)")
-    ap.add_argument("--data", default=None, help="real-dataset dir (fundamental/homography/essential)")
-    ap.add_argument("--gt-thresh", type=float, default=3.0)
-    ap.add_argument("--sigma", type=float, default=3.0, help="MAGSAC++ sigma_th / reproj threshold")
-    ap.add_argument("--seed", type=int, default=-1, help="estimator seed (-1=random); set for reproducible runs")
-    ap.add_argument("--out", default=None)
-    ap.add_argument("--label", default="run")
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--task", choices=list(TASKS) + ["all"], default="all")
+    ap.add_argument("--data", help="directory of '<scene>_pts.txt' files (real data)")
+    ap.add_argument("--magsac", action="store_true", help="MAGSAC instead of MAGSAC++")
+    ap.add_argument("--sigma", type=float,
+                    help="maximum sigma (default: 3 on synthetic data; on real data, "
+                         "the values of examples/cpp_example.cpp: 5 for F, 50 for H)")
+    ap.add_argument("--sampler", type=int, default=0,
+                    help="0 uniform, 1 PROSAC, 2 P-NAPSAC, 3 importance, 4 AR-Sampler")
+    ap.add_argument("--max-iters", type=int, default=10000)
+    ap.add_argument("--inliers", type=int, default=200, help="inliers per synthetic problem")
+    ap.add_argument("--runs", type=int, default=100,
+                    help="synthetic problems per setting, or runs per real scene")
+    ap.add_argument("--quick", action="store_true", help="fewer synthetic settings")
+    ap.add_argument("--out", help="write the rows to this CSV file")
     ap.add_argument("--compare", nargs=2, metavar=("A.csv", "B.csv"))
-    a = ap.parse_args()
-    if a.compare:
-        return compare(*a.compare)
-    tasks = list(TASKS) if a.task == "all" else [a.task]
-    multi = len(tasks) > 1
-    all_rows = []
-    for task in tasks:
-        ok, why = backend_ok(task, a.backend)
-        if not ok:
-            print(f"[{a.label}] {why} — skipped."); continue
-        if a.data and task not in DATA_TASKS:
-            print(f"[{a.label}] {task}: no real-dataset loader — skipped."); continue
-        if not a.data and TASKS[task][1] is None:
-            print(f"[{a.label}] {task}: real-data only (no synthetic generator) — use --data."); continue
-        if a.sweep_sigma:
-            sigmas = [float(x) for x in a.sweep_sigma.split(",")]
-            rows = list(run_sweep_sigma(task, sigmas, a.backend, a.sampler, a.coherent))
-            lead_h, lead = f"{'sigma':>7}", lambda r: f"{r['sigma']:>7}"
-        elif a.data:
-            rows = list(run_data(task, a.data, a.gt_thresh, a.sigma, a.backend, a.sampler, a.seed))
-            lead_h, lead = f"{'name':>20}", lambda r: f"{r['name']:>20}"
-        else:
-            rows = list(run_synthetic(task, a.quick, a.sigma, a.backend, a.sampler, a.coherent))
-            lead_h, lead = (f"{'n':>5} {'noise':>6} {'out':>5}",
-                            lambda r: f"{r['n']:>5} {r['noise']:>5}  {int(r['out']*100):>3}%")
-        cols = [c for c in ("err", "gt_err", "F1", "inliers", "none", "time_ms") if c in rows[0]]
-        print(f"[{a.label}] {a.backend} {task}" + ("  (coherent)" if a.coherent else ""))
-        print(f"{lead_h} | " + " ".join(f"{c:>8}" for c in cols))
-        print("-" * (len(lead_h) + 3 + 9 * len(cols)))
-        for r in rows:
-            print(f"{lead(r)} | " + " ".join(f"{r.get(c, ''):>8}" for c in cols))
-        if multi:
-            for r in rows:
-                r["task"] = task
-        all_rows += rows
-    if a.out and all_rows:
-        cols = (["task"] if multi else []) + [c for c in all_rows[0] if c != "task"]
-        with open(a.out, "w", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
-            w.writeheader(); w.writerows(all_rows)
-        print(f"\nWrote {a.out} ({len(all_rows)} rows)")
+    args = ap.parse_args()
+    if args.compare:
+        return compare(*args.compare)
+    if args.data:
+        if args.task == "all":
+            ap.error("--data needs --task fundamental or --task homography")
+        rows = list(run_real(args.task, args))
+        print_rows(rows)
+        print(f"{len(rows)} scenes, median err {np.nanmedian([r['err'] for r in rows]):.2f} px")
+    else:
+        tasks = list(TASKS) if args.task == "all" else [args.task]
+        rows = [row for task in tasks for row in run_synthetic(task, args)]
+        print_rows(rows)
+    if args.out:
+        with open(args.out, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=list(rows[0]))
+            writer.writeheader()
+            writer.writerows(rows)
 
 
 if __name__ == "__main__":
