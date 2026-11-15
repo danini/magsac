@@ -169,7 +169,7 @@ int findFundamentalMatrix_(
     int max_iters,
     int partition_num)
 {
-    magsac::utils::DefaultFundamentalMatrixEstimator estimator(0.1); // The robust homography estimator class containing the
+    magsac::utils::DefaultFundamentalMatrixEstimator estimator(sigma_max); // The robust homography estimator class containing the
     gcransac::FundamentalMatrix model; // The estimated model
 
     MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>* magsac;
