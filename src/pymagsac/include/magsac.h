@@ -928,6 +928,13 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensusPlusPlus(
 		// Return the refined model
 		refined_model_ = polished_model;
 
+		// Count the points close to the refined model: score_.inlier_number still
+		// holds the count of the model before the last weighted fit
+		score_.inlier_number = 0;
+		for (size_t point_idx = 0; point_idx < point_number; ++point_idx)
+			if (estimator_.residual(points_.row(point_idx), refined_model_) < interrupting_threshold)
+				++score_.inlier_number;
+
 		// Calculate the score of the model and the implied iteration number
 		getModelQualityPlusPlus(points_, // All the input points
 			refined_model_, // The estimated model
