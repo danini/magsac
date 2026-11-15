@@ -172,3 +172,5 @@ endif (CREATE_SAMPLE_PROJECT)
 #   cmake --build <build> --target test_inlier_count && <build>/test_inlier_count
 add_executable(test_inlier_count EXCLUDE_FROM_ALL tests/cpp/test_inlier_count.cpp)
 target_link_libraries(test_inlier_count ${PROJECT_NAME} GraphCutRANSAC ${OpenCV_LIBS} Eigen3::Eigen gflags ${TRGT_LNK_LBS_ADDITIONAL})
+# In <build>, not in the directory of SampleProject
+set_target_properties(test_inlier_count PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
