@@ -3,6 +3,7 @@
 #include <pybind11/stl_bind.h>
 #include <pybind11/numpy.h>
 #include "magsac_python.hpp"
+#include "bindings_utils.hpp"
 
 
 namespace py = pybind11;
@@ -392,6 +393,18 @@ py::tuple findLine2D(
     return py::make_tuple(line_, inliers_);
 }
 
+py::tuple findPlane3D(DoubleArray points_, DoubleArray probabilities_, int sampler, bool use_magsac_plus_plus,
+    double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
+{
+    std::vector<double> points = readRows(points_, 3, 3, "points");
+    std::vector<double> probabilities = readProbabilities(sampler, probabilities_, points_.shape(0));
+    std::vector<bool> inliers;
+    std::vector<double> plane;
+    const int num_inliers = findPlane3D_(points, inliers, plane, probabilities, sampler, use_magsac_plus_plus,
+        sigma_th, conf, min_iters, max_iters, partition_num);
+    return py::make_tuple(toArray(num_inliers, plane, { 4 }), toMask(inliers));
+}
+
 py::tuple findHomography(
     py::array_t<double>  correspondences_,
     double w1, 
@@ -561,6 +574,21 @@ PYBIND11_PLUGIN(pymagsac) {
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
         py::arg("partition_num") = 5); 
+
+  m.def("findPlane3D", &findPlane3D, R"doc(Fits a plane (a, b, c, d), with ax + by + cz + d = 0 and a unit normal (a, b, c), to points [n,3].
+Returns (plane, mask). The residual is the distance of a point to the plane, in the points' units, as sigma_th.
+Samplers: 0 (uniform), 1 (PROSAC, rows sorted by decreasing quality), 3 (NG-RANSAC) and 4 (AR-Sampler); 3 and 4 need
+probabilities, one per row, finite and non-negative, at least one positive. Sampler 2 (P-NAPSAC) needs the image sizes,
+which this function doesn't take. The mask marks the rows whose residual is at most sigma_th.)doc",
+        py::arg("points"),
+        py::arg("probabilities"),
+        py::arg("sampler") = 0,
+        py::arg("use_magsac_plus_plus") = true,
+        py::arg("sigma_th") = 1.0,
+        py::arg("conf") = 0.99,
+        py::arg("min_iters") = 50,
+        py::arg("max_iters") = 1000,
+        py::arg("partition_num") = 5);
 
 
   return m.ptr();

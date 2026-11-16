@@ -6,6 +6,7 @@
 #include "estimators/homography_estimator.h"
 #include "estimators/linear_model_estimator.h"
 #include "model.h"
+#include "estimator_wrapper.h"
 
 namespace magsac
 {
@@ -653,6 +654,27 @@ namespace magsac
 				return 1.0 / (4.0 * getGammaFunction());
 			}
 		};
+
+		// The estimator for 3D plane fitting. It rejects the minimal samples whose points are
+		// collinear or repeat a point (PROSAC's first sample and NG-RANSAC's samples can): they
+		// define no plane, and the minimal solver would return the null model (0, 0, 0, 0), to
+		// which every point has a zero residual.
+		class Plane3DEstimator :
+			public Wrapper<gcransac::estimator::LinearModelEstimator<gcransac::estimator::solver::LinearModelSolver<3>, // The solver used for fitting a model to a minimal sample
+				gcransac::estimator::solver::LinearModelSolver<3>, 3>, false> // The solver used for fitting a model to a non-minimal sample
+		{
+		public:
+			bool isValidSample(const cv::Mat& data_, const size_t* sample_) const override
+			{
+				const Eigen::Map<const Eigen::Vector3d> p0(data_.ptr<double>(sample_[0])),
+					p1(data_.ptr<double>(sample_[1])),
+					p2(data_.ptr<double>(sample_[2]));
+				const Eigen::Vector3d t1 = p1 - p0, t2 = p2 - p0;
+				// The sine of the angle between t1 and t2 must be larger than the machine epsilon
+				constexpr double eps = std::numeric_limits<double>::epsilon();
+				return t1.cross(t2).squaredNorm() > eps * eps * t1.squaredNorm() * t2.squaredNorm();
+			}
+		};
 	}
 
 	namespace utils
@@ -681,5 +703,8 @@ namespace magsac
 		typedef estimator::Line2DEstimator<gcransac::estimator::solver::LinearModelSolver<2>, // The solver used for fitting a model to a minimal sample
 			gcransac::estimator::solver::LinearModelSolver<2>>  // The solver used for fitting a model to a non-minimal sample
 			Default2DLineEstimator;
+
+		// The default estimator for 3D plane fitting
+		typedef estimator::Plane3DEstimator Default3DPlaneEstimator;
 	}
 }
