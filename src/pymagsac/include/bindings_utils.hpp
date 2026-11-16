@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -21,7 +22,7 @@ inline std::vector<double> readRows(const DoubleArray& array, pybind11::ssize_t 
 }
 
 // The inlier probabilities of the n data points, used only by samplers 3 (NG-RANSAC) and
-// 4 (AR-Sampler), which need one per point, and, for the AR-Sampler, a positive one.
+// 4 (AR-Sampler): one per point, finite and non-negative, and at least one positive.
 inline std::vector<double> readProbabilities(int sampler, const DoubleArray& probabilities, pybind11::ssize_t n)
 {
     if (sampler != 3 && sampler != 4)
@@ -30,8 +31,15 @@ inline std::vector<double> readProbabilities(int sampler, const DoubleArray& pro
         throw std::invalid_argument("probabilities should have one value per data point (" +
             std::to_string(n) + ") with samplers 3 and 4, not " + std::to_string(probabilities.size()));
     std::vector<double> values(probabilities.data(), probabilities.data() + n);
-    if (sampler == 4 && !(*std::max_element(values.begin(), values.end()) > 0))
-        throw std::invalid_argument("probabilities should have a positive value with sampler 4");
+    bool has_positive = false;
+    for (const double value : values)
+    {
+        if (!std::isfinite(value) || value < 0)
+            throw std::invalid_argument("probabilities should be finite and non-negative with samplers 3 and 4");
+        has_positive = has_positive || value > 0;
+    }
+    if (!has_positive)
+        throw std::invalid_argument("probabilities should have a positive value with samplers 3 and 4");
     return values;
 }
 

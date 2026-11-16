@@ -168,9 +168,20 @@ def test_plane_fitting_insufficient_points():
 
 
 @pytest.mark.parametrize("sampler, probabilities", [
-    (3, []), (4, []), (3, [0.5] * 10), (4, np.zeros(20))])
+    (3, []), (4, []), (3, [0.5] * 10),
+    (3, np.zeros(20)), (4, np.zeros(20)),
+    (3, np.r_[-0.5, np.ones(19)]), (4, np.r_[-0.5, np.ones(19)]),
+    (3, np.r_[np.nan, np.ones(19)]), (4, np.r_[np.inf, np.ones(19)])])
 def test_plane_fitting_invalid_probabilities(sampler, probabilities):
-    """Samplers 3 and 4 need one probability per row (and, for 4, a positive one)."""
+    """Samplers 3 and 4 need one probability per row, finite and non-negative, at least one positive."""
     points = np.random.default_rng(0).uniform(-1, 1, (20, 3))
     with pytest.raises(ValueError):
         pymagsac.findPlane3D(points, probabilities, sampler=sampler)
+
+
+@pytest.mark.parametrize("sampler", [2, 5, -1])
+def test_plane_fitting_unsupported_sampler(sampler):
+    """Sampler 2 (P-NAPSAC) needs the image sizes, which findPlane3D doesn't take; 5 and -1 don't exist."""
+    points = np.random.default_rng(0).uniform(-1, 1, (20, 3))
+    with pytest.raises(ValueError):
+        pymagsac.findPlane3D(points, np.ones(20), sampler=sampler)

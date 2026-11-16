@@ -578,7 +578,8 @@ PYBIND11_PLUGIN(pymagsac) {
   m.def("findPlane3D", &findPlane3D, R"doc(Fits a plane (a, b, c, d), with ax + by + cz + d = 0 and a unit normal (a, b, c), to points [n,3].
 Returns (plane, mask). The residual is the distance of a point to the plane, in the points' units, as sigma_th.
 Samplers: 0 (uniform), 1 (PROSAC, rows sorted by decreasing quality), 3 (NG-RANSAC) and 4 (AR-Sampler); 3 and 4 need
-probabilities, one per row (for 4, at least one positive). The mask marks the rows whose residual is at most sigma_th.)doc",
+probabilities, one per row, finite and non-negative, at least one positive. Sampler 2 (P-NAPSAC) needs the image sizes,
+which this function doesn't take. The mask marks the rows whose residual is at most sigma_th.)doc",
         py::arg("points"),
         py::arg("probabilities"),
         py::arg("sampler") = 0,
