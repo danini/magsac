@@ -1,4 +1,4 @@
-"""Test ``pymagsac.findEssentialMatrixPlanar`` and ``pymagsac.findEssentialMatrixGravity``."""
+"""Test ``pymagsac.findPlanarEssentialMatrix`` and ``pymagsac.findGravityEssentialMatrix``."""
 import pymagsac
 import numpy as np
 import pytest
@@ -46,7 +46,7 @@ def check(E, mask, R, t):
 def test_essential_planar(use_magsac_plus_plus):
     """Planar motion: rotation about the y axis, translation in the xz plane."""
     R, t = rotation_matrix([0, 1, 0], 5), np.array([0.5, 0.0, 0.1])
-    E, mask = pymagsac.findEssentialMatrixPlanar(
+    E, mask = pymagsac.findPlanarEssentialMatrix(
         generate_correspondences(R, t), K1=K, K2=K, probabilities=[],
         use_magsac_plus_plus=use_magsac_plus_plus, sigma_th=2.0, min_iters=500, max_iters=5000)
     check(E, mask, R, t)
@@ -54,7 +54,7 @@ def test_essential_planar(use_magsac_plus_plus):
 
 def test_essential_planar_insufficient_points():
     with pytest.raises(ValueError):
-        pymagsac.findEssentialMatrixPlanar(np.random.rand(1, 4), K1=K, K2=K, probabilities=[])
+        pymagsac.findPlanarEssentialMatrix(np.random.rand(1, 4), K1=K, K2=K, probabilities=[])
 
 
 @pytest.mark.parametrize("use_magsac_plus_plus", [True, False])
@@ -63,14 +63,15 @@ def test_essential_gravity(use_magsac_plus_plus):
     G1, G2 = rotation_matrix([1, 0, 0.3], 8), rotation_matrix([0.2, 0, 1], -6)
     R = G2.T @ rotation_matrix([0, 1, 0], 10) @ G1
     t = np.array([0.3, -0.1, 0.5])
-    E, mask = pymagsac.findEssentialMatrixGravity(
-        generate_correspondences(R, t), K1=K, K2=K, gravity_src=G1, gravity_dst=G2,
-        probabilities=[], use_magsac_plus_plus=use_magsac_plus_plus, sigma_th=2.0, min_iters=500, max_iters=5000)
+    # Positional arguments, in the order of pygcransac's findGravityEssentialMatrix.
+    E, mask = pymagsac.findGravityEssentialMatrix(
+        generate_correspondences(R, t), G1, G2, K, K, [],
+        use_magsac_plus_plus=use_magsac_plus_plus, sigma_th=2.0, min_iters=500, max_iters=5000)
     check(E, mask, R, t)
 
 
 def test_essential_gravity_insufficient_points():
     G = np.eye(3)
     with pytest.raises(ValueError):
-        pymagsac.findEssentialMatrixGravity(np.random.rand(2, 4), K1=K, K2=K,
-                                            gravity_src=G, gravity_dst=G, probabilities=[])
+        pymagsac.findGravityEssentialMatrix(np.random.rand(2, 4), source_gravity=G, destination_gravity=G,
+                                            K1=K, K2=K, probabilities=[])

@@ -937,7 +937,7 @@ int findHomographyAffine_(std::vector<double>& correspondences,
     return num_inliers;
 }
 
-int findEssentialMatrixPlanar_(std::vector<double>& correspondences,
+int findPlanarEssentialMatrix_(std::vector<double>& correspondences,
     std::vector<bool>& inliers,
     std::vector<double>& E,
     std::vector<double>& src_K,
@@ -958,13 +958,13 @@ int findEssentialMatrixPlanar_(std::vector<double>& correspondences,
         inlier_probabilities, sampler_id, use_magsac_plus_plus, sigma_max, conf, min_iters, max_iters, partition_num);
 }
 
-int findEssentialMatrixGravity_(std::vector<double>& correspondences,
+int findGravityEssentialMatrix_(std::vector<double>& correspondences,
     std::vector<bool>& inliers,
     std::vector<double>& E,
+    std::vector<double>& source_gravity,
+    std::vector<double>& destination_gravity,
     std::vector<double>& src_K,
     std::vector<double>& dst_K,
-    std::vector<double>& gravity_src,
-    std::vector<double>& gravity_dst,
     std::vector<double>& inlier_probabilities,
     int sampler_id,
     bool use_magsac_plus_plus,
@@ -978,8 +978,8 @@ int findEssentialMatrixGravity_(std::vector<double>& correspondences,
     const Eigen::Matrix3d intrinsics_dst = Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(&dst_K[0]);
     magsac::utils::DefaultGravityEssentialMatrixEstimator estimator(intrinsics_src, intrinsics_dst);
     estimator.getMutableMinimalSolver()->setGravity(
-        Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(&gravity_src[0]),
-        Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(&gravity_dst[0]));
+        Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(&source_gravity[0]),
+        Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor>>(&destination_gravity[0]));
     return runMagsacEssential(correspondences, estimator, intrinsics_src, intrinsics_dst, inliers, E,
         inlier_probabilities, sampler_id, use_magsac_plus_plus, sigma_max, conf, min_iters, max_iters, partition_num);
 }

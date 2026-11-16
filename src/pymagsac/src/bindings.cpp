@@ -515,7 +515,7 @@ py::tuple findHomographyAffine(DoubleArray correspondences_, DoubleArray probabi
     return py::make_tuple(toArray(num_inliers, H, { 3, 3 }), toMask(inliers));
 }
 
-py::tuple findEssentialMatrixPlanar(DoubleArray correspondences_, DoubleArray K1_, DoubleArray K2_, DoubleArray probabilities_,
+py::tuple findPlanarEssentialMatrix(DoubleArray correspondences_, DoubleArray K1_, DoubleArray K2_, DoubleArray probabilities_,
     int sampler, bool use_magsac_plus_plus, double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
 {
     std::vector<double> correspondences = readRows(correspondences_, 4, 2, "correspondences");
@@ -523,22 +523,23 @@ py::tuple findEssentialMatrixPlanar(DoubleArray correspondences_, DoubleArray K1
     std::vector<double> probabilities = readProbabilities(sampler, probabilities_, correspondences_.shape(0));
     std::vector<bool> inliers;
     std::vector<double> E;
-    const int num_inliers = findEssentialMatrixPlanar_(correspondences, inliers, E, K1, K2, probabilities, sampler,
+    const int num_inliers = findPlanarEssentialMatrix_(correspondences, inliers, E, K1, K2, probabilities, sampler,
         use_magsac_plus_plus, sigma_th, conf, min_iters, max_iters, partition_num);
     return py::make_tuple(toArray(num_inliers, E, { 3, 3 }), toMask(inliers));
 }
 
-py::tuple findEssentialMatrixGravity(DoubleArray correspondences_, DoubleArray K1_, DoubleArray K2_,
-    DoubleArray gravity_src_, DoubleArray gravity_dst_, DoubleArray probabilities_,
+py::tuple findGravityEssentialMatrix(DoubleArray correspondences_, DoubleArray source_gravity_,
+    DoubleArray destination_gravity_, DoubleArray K1_, DoubleArray K2_, DoubleArray probabilities_,
     int sampler, bool use_magsac_plus_plus, double sigma_th, double conf, int min_iters, int max_iters, int partition_num)
 {
     std::vector<double> correspondences = readRows(correspondences_, 4, 3, "correspondences");
+    std::vector<double> source_gravity = readMatrix3(source_gravity_, "source_gravity");
+    std::vector<double> destination_gravity = readMatrix3(destination_gravity_, "destination_gravity");
     std::vector<double> K1 = readMatrix3(K1_, "K1"), K2 = readMatrix3(K2_, "K2");
-    std::vector<double> gravity_src = readMatrix3(gravity_src_, "gravity_src"), gravity_dst = readMatrix3(gravity_dst_, "gravity_dst");
     std::vector<double> probabilities = readProbabilities(sampler, probabilities_, correspondences_.shape(0));
     std::vector<bool> inliers;
     std::vector<double> E;
-    const int num_inliers = findEssentialMatrixGravity_(correspondences, inliers, E, K1, K2, gravity_src, gravity_dst,
+    const int num_inliers = findGravityEssentialMatrix_(correspondences, inliers, E, source_gravity, destination_gravity, K1, K2,
         probabilities, sampler, use_magsac_plus_plus, sigma_th, conf, min_iters, max_iters, partition_num);
     return py::make_tuple(toArray(num_inliers, E, { 3, 3 }), toMask(inliers));
 }
@@ -555,6 +556,11 @@ PYBIND11_PLUGIN(pymagsac) {
            findEssentialMatrix,
            findFundamentalMatrix,
            findHomography,
+           findPnP,
+           findRadialHomography,
+           findHomographyAffine,
+           findPlanarEssentialMatrix,
+           findGravityEssentialMatrix,
            adaptiveInlierSelection
     
     )doc");
@@ -562,14 +568,15 @@ PYBIND11_PLUGIN(pymagsac) {
   m.def("findPnP", &findPnP, R"doc(Fits a camera pose [R | t] (3x4), x_camera = R x_world + t, to correspondences [n,5]: (u, v, x, y, z),
 where (u, v) are normalized image coordinates (K^-1 applied) and (x, y, z) the world point. Returns (pose, mask).
 The residual is the reprojection error in normalized coordinates, and sigma_th is in these units: a threshold of
-t pixels is t / f for a focal length of f pixels (the default, 0.01, is 10 px at f = 1000 px).
+t pixels is t / f for a focal length of f pixels (the default, 0.001, is 1 px at f = 1000 px).
 Samplers: 0 (uniform), 1 (PROSAC, rows sorted by decreasing quality), 3 (NG-RANSAC) and 4 (AR-Sampler); 3 and 4 need
-probabilities, one per row (for 4, at least one positive). The mask marks the rows whose residual is at most sigma_th.)doc",
+probabilities, one per row, finite and non-negative, at least one positive. Sampler 2 (P-NAPSAC) needs the image sizes,
+which this function doesn't take. The mask marks the rows whose residual is at most sigma_th.)doc",
         py::arg("correspondences"),
         py::arg("probabilities"),
         py::arg("sampler") = 0,
         py::arg("use_magsac_plus_plus") = true,
-        py::arg("sigma_th") = 0.01,
+        py::arg("sigma_th") = 0.001,
         py::arg("conf") = 0.99,
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
@@ -580,14 +587,15 @@ in each image to correspondences [n,4]: (x1, y1, x2, y2), with coordinates relat
 the image centres, divided by the image size). An undistorted point is (x, y, 1 + lambda * (x^2 + y^2)).
 Returns (H, distortion, mask). The residual is the mean of the forward and backward transfer errors between the undistorted
 points, in the units of the coordinates, as sigma_th: with coordinates divided by s pixels, a threshold of t pixels
-is t / s (the default, 0.01, is 10 px for s = 1000 px).
+is t / s (the default, 0.001, is 1 px for s = 1000 px).
 Samplers: 0 (uniform), 1 (PROSAC, rows sorted by decreasing quality), 3 (NG-RANSAC) and 4 (AR-Sampler); 3 and 4 need
-probabilities, one per row (for 4, at least one positive). The mask marks the rows whose residual is at most sigma_th.)doc",
+probabilities, one per row, finite and non-negative, at least one positive. Sampler 2 (P-NAPSAC) needs the image sizes,
+which this function doesn't take. The mask marks the rows whose residual is at most sigma_th.)doc",
         py::arg("correspondences"),
         py::arg("probabilities"),
         py::arg("sampler") = 0,
         py::arg("use_magsac_plus_plus") = true,
-        py::arg("sigma_th") = 0.01,
+        py::arg("sigma_th") = 0.001,
         py::arg("conf") = 0.99,
         py::arg("min_iters") = 50,
         py::arg("max_iters") = 1000,
@@ -598,7 +606,8 @@ where A = [[a11, a12], [a21, a22]] maps a neighbourhood of (x1, y1) to one of (x
 Only the minimal solver (two affine correspondences) uses A: the residual is the transfer error of (x1, y1) in pixels,
 as sigma_th, and the final model is fitted to the inliers' points (four-point solver).
 Samplers: 0 (uniform), 1 (PROSAC, rows sorted by decreasing quality), 3 (NG-RANSAC) and 4 (AR-Sampler); 3 and 4 need
-probabilities, one per row (for 4, at least one positive). The mask marks the rows whose residual is at most sigma_th.)doc",
+probabilities, one per row, finite and non-negative, at least one positive. Sampler 2 (P-NAPSAC) needs the image sizes,
+which this function doesn't take. The mask marks the rows whose residual is at most sigma_th.)doc",
         py::arg("correspondences"),
         py::arg("probabilities"),
         py::arg("sampler") = 0,
@@ -609,13 +618,14 @@ probabilities, one per row (for 4, at least one positive). The mask marks the ro
         py::arg("max_iters") = 1000,
         py::arg("partition_num") = 5);
 
-  m.def("findEssentialMatrixPlanar", &findEssentialMatrixPlanar, R"doc(Fits an essential matrix assuming a planar motion (rotation about the camera's y axis,
+  m.def("findPlanarEssentialMatrix", &findPlanarEssentialMatrix, R"doc(Fits an essential matrix assuming a planar motion (rotation about the camera's y axis,
 translation in its xz plane) to correspondences [n,4] in pixels, given the intrinsics K1 and K2.
 Returns (E, mask). Only the minimal solver (two points) assumes the planar motion: the final model is a general essential
 matrix fitted to the inliers (five-point solver, then bundle adjustment), so it satisfies the constraint only approximately.
 The residual is the Sampson distance, in pixels (converted by the mean focal length), as sigma_th.
 Samplers: 0 (uniform), 1 (PROSAC, rows sorted by decreasing quality), 3 (NG-RANSAC) and 4 (AR-Sampler); 3 and 4 need
-probabilities, one per row (for 4, at least one positive). The mask marks the rows whose residual is at most sigma_th.)doc",
+probabilities, one per row, finite and non-negative, at least one positive. Sampler 2 (P-NAPSAC) needs the image sizes,
+which this function doesn't take. The mask marks the rows whose residual is at most sigma_th.)doc",
         py::arg("correspondences"),
         py::arg("K1"),
         py::arg("K2"),
@@ -628,18 +638,19 @@ probabilities, one per row (for 4, at least one positive). The mask marks the ro
         py::arg("max_iters") = 1000,
         py::arg("partition_num") = 5);
 
-  m.def("findEssentialMatrixGravity", &findEssentialMatrixGravity, R"doc(Fits an essential matrix to correspondences [n,4] in pixels, given the intrinsics K1 and K2
-and the rotations gravity_src and gravity_dst that align each camera's y axis with gravity (so the remaining rotation is about
-the vertical axis). Returns (E, mask). Only the minimal solver (three points) uses the gravity directions: the final model
+  m.def("findGravityEssentialMatrix", &findGravityEssentialMatrix, R"doc(Fits an essential matrix to correspondences [n,4] in pixels, given the rotations
+source_gravity and destination_gravity that align each camera's y axis with gravity (so the remaining rotation is about
+the vertical axis) and the intrinsics K1 and K2. Returns (E, mask). Only the minimal solver (three points) uses the gravity directions: the final model
 is a general essential matrix fitted to the inliers (five-point solver, then bundle adjustment), so it satisfies the
 constraint only approximately. The residual is the Sampson distance, in pixels (converted by the mean focal length), as sigma_th.
 Samplers: 0 (uniform), 1 (PROSAC, rows sorted by decreasing quality), 3 (NG-RANSAC) and 4 (AR-Sampler); 3 and 4 need
-probabilities, one per row (for 4, at least one positive). The mask marks the rows whose residual is at most sigma_th.)doc",
+probabilities, one per row, finite and non-negative, at least one positive. Sampler 2 (P-NAPSAC) needs the image sizes,
+which this function doesn't take. The mask marks the rows whose residual is at most sigma_th.)doc",
         py::arg("correspondences"),
+        py::arg("source_gravity"),
+        py::arg("destination_gravity"),
         py::arg("K1"),
         py::arg("K2"),
-        py::arg("gravity_src"),
-        py::arg("gravity_dst"),
         py::arg("probabilities"),
         py::arg("sampler") = 0,
         py::arg("use_magsac_plus_plus") = true,

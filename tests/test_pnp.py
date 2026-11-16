@@ -124,9 +124,20 @@ def test_pnp_insufficient_points():
 
 
 @pytest.mark.parametrize("sampler, probabilities", [
-    (3, []), (4, []), (3, [0.5] * 10), (4, np.zeros(20))])
+    (3, []), (4, []), (3, [0.5] * 10),
+    (3, np.zeros(20)), (4, np.zeros(20)),
+    (3, np.r_[-0.5, np.ones(19)]), (4, np.r_[-0.5, np.ones(19)]),
+    (3, np.r_[np.nan, np.ones(19)]), (4, np.r_[np.inf, np.ones(19)])])
 def test_pnp_invalid_probabilities(sampler, probabilities):
-    """Samplers 3 and 4 need one probability per row (and, for 4, a positive one)."""
+    """Samplers 3 and 4 need one probability per row, finite and non-negative, at least one positive."""
     corrs = np.random.default_rng(0).uniform(-1, 1, (20, 5))
     with pytest.raises(ValueError):
         pymagsac.findPnP(corrs, probabilities, sampler=sampler)
+
+
+@pytest.mark.parametrize("sampler", [2, 5, -1])
+def test_pnp_unsupported_sampler(sampler):
+    """Sampler 2 (P-NAPSAC) needs the image sizes, which findPnP doesn't take; 5 and -1 don't exist."""
+    corrs = np.random.default_rng(0).uniform(-1, 1, (20, 5))
+    with pytest.raises(ValueError):
+        pymagsac.findPnP(corrs, np.ones(20), sampler=sampler)

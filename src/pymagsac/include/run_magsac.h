@@ -1,7 +1,8 @@
 #pragma once
 
-#include <cstdio>
 #include <memory>
+#include <stdexcept>
+#include <string>
 #include <vector>
 #include <Eigen/Core>
 #include <opencv2/core/core.hpp>
@@ -17,7 +18,8 @@
 // threshold to the estimated model as inliers. Returns the number of inliers, or 0 if
 // no model was found. Samplers: 0 (uniform), 1 (PROSAC, the points must be sorted by
 // quality), 3 (NG-RANSAC) and 4 (AR-Sampler), the last two using the inlier probabilities,
-// one per point (checked by the caller).
+// one per point (checked by the caller). Other samplers raise std::invalid_argument: sampler 2
+// (P-NAPSAC) needs the image sizes, which these functions don't take.
 template <class Estimator>
 int runMagsac(const cv::Mat& points,
     Estimator& estimator,
@@ -52,11 +54,8 @@ int runMagsac(const cv::Mat& points,
         sampler.reset(new gcransac::sampler::AdaptiveReorderingSampler(&points, inlier_probabilities, estimator.sampleSize(), 0.1));
     }
     else
-    {
-        fprintf(stderr, "Unknown sampler identifier: %d. The accepted samplers are 0 (uniform sampling), 1 (PROSAC sampling), 3 (NG-RANSAC sampler), 4 (AR-Sampler)\n",
-            sampler_id);
-        return 0;
-    }
+        throw std::invalid_argument("sampler should be 0 (uniform), 1 (PROSAC), 3 (NG-RANSAC) or 4 (AR-Sampler), not " +
+            std::to_string(sampler_id) + (sampler_id == 2 ? " (P-NAPSAC needs the image sizes)" : ""));
 
     MAGSAC<cv::Mat, Estimator> magsac(use_magsac_plus_plus ?
         MAGSAC<cv::Mat, Estimator>::MAGSAC_PLUS_PLUS :

@@ -60,7 +60,7 @@ int findHomographyAffine_(std::vector<double>& correspondences,
 
 // Fits an essential matrix to rows (x1, y1, x2, y2) in pixels, assuming a planar motion
 // (rotation about the vertical axis, translation in the horizontal plane).
-int findEssentialMatrixPlanar_(std::vector<double>& correspondences,
+int findPlanarEssentialMatrix_(std::vector<double>& correspondences,
     std::vector<bool>& inliers,
     std::vector<double>& E,
     std::vector<double>& src_K,
@@ -76,13 +76,13 @@ int findEssentialMatrixPlanar_(std::vector<double>& correspondences,
 
 // Fits an essential matrix to rows (x1, y1, x2, y2) in pixels, given the rotations that
 // align each camera's vertical axis with gravity.
-int findEssentialMatrixGravity_(std::vector<double>& correspondences,
+int findGravityEssentialMatrix_(std::vector<double>& correspondences,
     std::vector<bool>& inliers,
     std::vector<double>& E,
+    std::vector<double>& source_gravity,
+    std::vector<double>& destination_gravity,
     std::vector<double>& src_K,
     std::vector<double>& dst_K,
-    std::vector<double>& gravity_src,
-    std::vector<double>& gravity_dst,
     std::vector<double>& inlier_probabilities,
     int sampler_id,
     bool use_magsac_plus_plus,
