@@ -599,7 +599,7 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensus(
 		if constexpr (ModelEstimator::doesNormalizationForNonMinimalFitting())
 			final_weights.emplace_back(weight);
 		else
-			final_weights[point_idx] = weight;
+			final_weights[all_residuals[point_idx].second] = weight;
 	}
 
 	// If there are fewer inliers than the size of the minimal sample interupt the procedure
