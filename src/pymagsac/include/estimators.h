@@ -684,9 +684,9 @@ namespace magsac
 			DefaultHomographyEstimator;
 
 		// The default estimator for absolute pose (PnP) fitting. On a non-minimal sample, PnPBundleAdjustment
-		// fits EPnP (OpenCV's solvePnP, unweighted), then calls pose_lib::refine_pnp, which at the
-		// graph-cut-ransac commit used here returns without refining (-1: its camera-model and
-		// loss-function switches have no cases).
+		// fits EPnP (OpenCV's solvePnP, unweighted), then calls pose_lib::refine_pnp, which at
+		// graph-cut-ransac 9fa075d returns without refining (-1: its camera-model and loss-function
+		// switches have no cases; danini/graph-cut-ransac#61 fixes it).
 		typedef estimator::Wrapper<gcransac::estimator::PerspectiveNPointEstimator<gcransac::estimator::solver::P3PSolver, // The solver used for fitting a model to a minimal sample
 			gcransac::estimator::solver::PnPBundleAdjustment>, false> // The solver used for fitting a model to a non-minimal sample
 			DefaultPnPEstimator;
