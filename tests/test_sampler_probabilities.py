@@ -1,4 +1,5 @@
-"""Samplers 3 (importance) and 4 (AR-Sampler) need one probability per point."""
+"""Samplers 3 (importance) and 4 (AR-Sampler) need one probability per point, finite and non-negative,
+at least one positive."""
 import numpy as np
 import pymagsac
 import pytest
@@ -27,6 +28,19 @@ FUNCTIONS = {
 def test_wrong_number_of_probabilities(name, probabilities, sampler):
     data = np.ascontiguousarray(RNG.uniform(0, 100, (N, 4)))
     with pytest.raises(ValueError, match="one probability per point"):
+        FUNCTIONS[name](data, probabilities, sampler)
+
+
+@pytest.mark.parametrize("sampler", [3, 4])
+@pytest.mark.parametrize("probabilities, message", [
+    (np.zeros(N), "positive probability"),
+    (np.r_[-0.5, np.ones(N - 1)], "non-negative"),
+    (np.r_[np.nan, np.ones(N - 1)], "non-negative"),
+    (np.r_[np.inf, np.ones(N - 1)], "non-negative")])
+@pytest.mark.parametrize("name", FUNCTIONS)
+def test_invalid_probabilities(name, probabilities, message, sampler):
+    data = np.ascontiguousarray(RNG.uniform(0, 100, (N, 4)))
+    with pytest.raises(ValueError, match=message):
         FUNCTIONS[name](data, probabilities, sampler)
 
 

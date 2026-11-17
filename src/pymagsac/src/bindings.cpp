@@ -1,3 +1,4 @@
+#include <cmath>
 #include <stdexcept>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl_bind.h>
@@ -80,11 +81,22 @@ py::tuple adaptiveInlierSelection(
 
 }
 
-// The importance sampler (3) and the AR-Sampler (4) read one probability per point
+// The importance sampler (3) and the AR-Sampler (4) read one probability per point. The
+// values must be finite and non-negative, and at least one positive: the AR-Sampler divides
+// them by the largest one.
 void checkProbabilities(const std::vector<double>& probabilities, size_t point_number)
 {
     if (probabilities.size() != point_number)
         throw std::invalid_argument("Samplers 3 and 4 need one probability per point");
+    bool has_positive = false;
+    for (const double probability : probabilities)
+    {
+        if (!std::isfinite(probability) || probability < 0)
+            throw std::invalid_argument("Samplers 3 and 4 need finite, non-negative probabilities");
+        has_positive = has_positive || probability > 0;
+    }
+    if (!has_positive)
+        throw std::invalid_argument("Samplers 3 and 4 need at least one positive probability");
 }
 
 py::tuple findRigidTransformation(
