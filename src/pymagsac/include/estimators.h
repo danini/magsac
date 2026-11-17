@@ -5,7 +5,18 @@
 #include "estimators/fundamental_estimator.h"
 #include "estimators/homography_estimator.h"
 #include "estimators/linear_model_estimator.h"
+#include "estimators/perspective_n_point_estimator.h"
+#include "estimators/radial_homography_estimator.h"
+#include "estimators/homography_affine_correspondence_estimator.h"
+#include "estimators/solver_p3p.h"
+#include "estimators/solver_pnp_bundle_adjustment.h"
+#include "estimators/solver_radial_homography_5pc.h"
+#include "estimators/solver_radial_homography_6pc.h"
+#include "estimators/solver_homography_two_affine.h"
+#include "estimators/solver_essential_matrix_two_points_planar.h"
+#include "estimators/solver_essential_matrix_three_points_gravity.h"
 #include "model.h"
+#include "estimator_wrapper.h"
 
 namespace magsac
 {
@@ -671,6 +682,34 @@ namespace magsac
 		typedef estimator::HomographyEstimator<gcransac::estimator::solver::HomographyFourPointSolver, // The solver used for fitting a model to a minimal sample
 			gcransac::estimator::solver::HomographyFourPointSolver> // The solver used for fitting a model to a non-minimal sample
 			DefaultHomographyEstimator;
+
+		// The default estimator for absolute pose (PnP) fitting. On a non-minimal sample, PnPBundleAdjustment
+		// fits EPnP (OpenCV's solvePnP, unweighted), then calls pose_lib::refine_pnp, which at
+		// graph-cut-ransac 9fa075d returns without refining (-1: its camera-model and loss-function
+		// switches have no cases; danini/graph-cut-ransac#61 fixes it).
+		typedef estimator::Wrapper<gcransac::estimator::PerspectiveNPointEstimator<gcransac::estimator::solver::P3PSolver, // The solver used for fitting a model to a minimal sample
+			gcransac::estimator::solver::PnPBundleAdjustment>, false> // The solver used for fitting a model to a non-minimal sample
+			DefaultPnPEstimator;
+
+		// The default estimator for fitting a homography with radial distortion (division model)
+		typedef estimator::Wrapper<gcransac::estimator::RadialHomographyEstimator<gcransac::estimator::solver::RadialHomography5PC, // The solver used for fitting a model to a minimal sample
+			gcransac::estimator::solver::RadialHomography6PC>, false> // The solver used for fitting a model to a non-minimal sample
+			DefaultRadialHomographyEstimator;
+
+		// The default estimator for fitting a homography to affine correspondences
+		typedef estimator::Wrapper<gcransac::estimator::RobustHomographyAffineCorrespondenceEstimator<gcransac::estimator::solver::HomographyTwoAffineSolver, // The solver used for fitting a model to a minimal sample
+			gcransac::estimator::solver::HomographyFourPointSolver>, true> // The solver used for fitting a model to a non-minimal sample
+			DefaultHomographyAffineEstimator;
+
+		// The default estimator for essential matrix fitting under planar motion
+		typedef estimator::EssentialMatrixEstimator<gcransac::estimator::solver::EssentialMatrixTwoPointsPlanar, // The solver used for fitting a model to a minimal sample
+			gcransac::estimator::solver::EssentialMatrixBundleAdjustmentSolver> // The solver used for fitting a model to a non-minimal sample
+			DefaultPlanarEssentialMatrixEstimator;
+
+		// The default estimator for essential matrix fitting with a known gravity direction
+		typedef estimator::EssentialMatrixEstimator<gcransac::estimator::solver::EssentialMatrixThreePointsGravity, // The solver used for fitting a model to a minimal sample
+			gcransac::estimator::solver::EssentialMatrixBundleAdjustmentSolver> // The solver used for fitting a model to a non-minimal sample
+			DefaultGravityEssentialMatrixEstimator;
 
 		// The default estimator for rigid transformation fitting
 		typedef estimator::RigidTransformationEstimator<gcransac::estimator::solver::RigidTransformationSVDBasedSolver, // The solver used for fitting a model to a minimal sample
