@@ -17,6 +17,7 @@
 #include "samplers/adaptive_reordering_sampler.h"
 
 #include <thread>
+#include <algorithm>
 
 #include <gflags/gflags.h>
 
@@ -32,7 +33,8 @@ int findRigidTransformation_(
     //double neighborhood_size,
     int min_iters,
     int max_iters,
-    int partition_num)
+    int partition_num,
+    double reference_th)
 {
     magsac::utils::DefaultRigidTransformationEstimator estimator; // The robust rigid transformation estimator class containing the
     gcransac::RigidTransformation model; // The estimated model
@@ -45,6 +47,10 @@ int findRigidTransformation_(
         magsac = new MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>(
             MAGSAC<cv::Mat, magsac::utils::DefaultRigidTransformationEstimator>::MAGSAC_ORIGINAL);
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
+    // The reference threshold counts the inliers that set the number of iterations, and
+    // is the threshold of the validity check. Default: the inlier threshold, since these
+    // data have no pixel unit.
+    magsac->setReferenceThreshold(reference_th > 0 ? reference_th : sigma_max);
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
     magsac->setIterationLimit(max_iters);
@@ -167,7 +173,8 @@ int findFundamentalMatrix_(
     double conf,
     int min_iters,
     int max_iters,
-    int partition_num)
+    int partition_num,
+    double reference_th)
 {
     magsac::utils::DefaultFundamentalMatrixEstimator estimator(0.1); // The robust homography estimator class containing the
     gcransac::FundamentalMatrix model; // The estimated model
@@ -180,6 +187,10 @@ int findFundamentalMatrix_(
         magsac = new MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>(
             MAGSAC<cv::Mat, magsac::utils::DefaultFundamentalMatrixEstimator>::MAGSAC_ORIGINAL);
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
+    // The reference threshold counts the inliers that set the number of iterations, and
+    // is the threshold of the validity check. Default: 1 px, MAGSAC's default, and never
+    // above the inlier threshold.
+    magsac->setReferenceThreshold(reference_th > 0 ? reference_th : std::min(sigma_max, 1.0));
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
     magsac->setIterationLimit(max_iters);
@@ -303,7 +314,8 @@ int findEssentialMatrix_(std::vector<double>& correspondences,
     double conf,
     int min_iters,
     int max_iters,
-    int partition_num)
+    int partition_num,
+    double reference_th)
 {
     int num_tents = correspondences.size() / 4;
     cv::Mat points(num_tents, 4, CV_64F, &correspondences[0]);
@@ -354,7 +366,11 @@ int findEssentialMatrix_(std::vector<double>& correspondences,
     magsac.setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
     magsac.setIterationLimit(max_iters);
 	magsac.setMinimumIterationNumber(min_iters);
-    magsac.setReferenceThreshold(magsac.getReferenceThreshold() / threshold_normalizer); // The reference threshold inside MAGSAC++ should also be normalized.
+    // The reference threshold counts the inliers that set the number of iterations, and
+    // is the threshold of the validity check. Default: 1 px, MAGSAC's default, and never
+    // above the inlier threshold; normalized like the maximum threshold.
+    magsac.setReferenceThreshold(
+        (reference_th > 0 ? reference_th : std::min(sigma_max, 1.0)) / threshold_normalizer);
 	
 	// Initialize the samplers
 	// The main sampler is used for sampling in the main RANSAC loop
@@ -485,7 +501,8 @@ int findLine2D_(std::vector<double>& pointsArr,
     double conf,
     int min_iters,
     int max_iters,
-    int partition_num)
+    int partition_num,
+    double reference_th)
 {
     magsac::utils::Default2DLineEstimator estimator; // The robust homography estimator class containing the function for the fitting and residual calculation
     gcransac::Homography model; // The estimated model
@@ -499,6 +516,9 @@ int findLine2D_(std::vector<double>& pointsArr,
             MAGSAC<cv::Mat, magsac::utils::Default2DLineEstimator>::MAGSAC_ORIGINAL);
 
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
+    // The reference threshold counts the inliers that set the number of iterations.
+    // Default: 1 px, MAGSAC's default, and never above the inlier threshold.
+    magsac->setReferenceThreshold(reference_th > 0 ? reference_th : std::min(sigma_max, 1.0));
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
     magsac->setIterationLimit(max_iters);
@@ -604,7 +624,8 @@ int findHomography_(std::vector<double>& correspondences,
                     double conf,
                     int min_iters,
                     int max_iters,
-                    int partition_num)
+                    int partition_num,
+                    double reference_th)
 
 {
     magsac::utils::DefaultHomographyEstimator estimator; // The robust homography estimator class containing the function for the fitting and residual calculation
@@ -619,6 +640,9 @@ int findHomography_(std::vector<double>& correspondences,
             MAGSAC<cv::Mat, magsac::utils::DefaultHomographyEstimator>::MAGSAC_ORIGINAL);
 
     magsac->setMaximumThreshold(sigma_max); // The maximum noise scale sigma allowed
+    // The reference threshold counts the inliers that set the number of iterations.
+    // Default: 1 px, MAGSAC's default, and never above the inlier threshold.
+    magsac->setReferenceThreshold(reference_th > 0 ? reference_th : std::min(sigma_max, 1.0));
     magsac->setCoreNumber(1); // The number of cores used to speed up sigma-consensus
     magsac->setPartitionNumber(partition_num); // The number partitions used for speeding up sigma consensus. As the value grows, the algorithm become slower and, usually, more accurate.
     magsac->setIterationLimit(max_iters);

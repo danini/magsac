@@ -88,6 +88,14 @@ The example for essential matrix fitting is available at: [notebook](examples/ex
 
 An example comparing different samplers on fundamental matrix estimation is available at: [notebook](examples/example_samplers.ipynb).
 
+# Thresholds of the Python functions
+
+`sigma_th` is the inlier threshold, in the data's units (pixels for `findHomography`, `findFundamentalMatrix`, `findEssentialMatrix` and `findLine2D`): the largest residual of an inlier. MAGSAC++'s score takes the noise scale sigma_max as `sigma_th` / 3.64.
+
+`reference_th` (optional) is a second threshold, in the same units. The points closer than it to a model, among those closer than `sigma_th`, are counted to skip the models that can't be better than the best one so far and, for MAGSAC++, to set the number of iterations, as in RANSAC. For fundamental and essential matrices, and rigid transformations, it is also the threshold of a validity check of the models.
+
+By default (`reference_th=None`), it is 1 px (MAGSAC's default), or `sigma_th` if that is smaller; for `findRigidTransformation`, whose data have no pixel unit, it is `sigma_th`. This default assumes pixels: in other units, pass `reference_th` = 1 px in those units. `findFundamentalMatrix` also has a constant in pixels, the 3 px threshold of DEGENSAC's homography test (`degensac_homography_threshold_` in `estimators.h`): give it pixel coordinates. A larger `reference_th`, up to `sigma_th`, stops earlier: fewer iterations, usually less accurate models. Above `sigma_th`, it only loosens the validity checks.
+
 # Requirements
 
 - Eigen 3.0 or higher

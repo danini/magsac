@@ -24,7 +24,8 @@ int findLine2D_(std::vector<double>& points,
     double conf,
     int min_iters,
     int max_iters,
-    int partition_num);
+    int partition_num,
+    double reference_th); // <= 0: the default (see magsac_python.cpp)
 
 int findFundamentalMatrix_(
     std::vector<double>& correspondences,
@@ -41,7 +42,8 @@ int findFundamentalMatrix_(
     double conf,
     int min_iters,
     int max_iters,
-    int partition_num);
+    int partition_num,
+    double reference_th); // <= 0: the default (see magsac_python.cpp)
 
 int findHomography_(std::vector<double>& correspondences,
                     std::vector<bool>& inliers,
@@ -57,7 +59,8 @@ int findHomography_(std::vector<double>& correspondences,
                     double conf,
                     int min_iters,
                     int max_iters,
-                    int partition_num);
+                    int partition_num,
+                    double reference_th); // <= 0: the default (see magsac_python.cpp)
 
 int findEssentialMatrix_(std::vector<double>& correspondences,
     std::vector<bool>& inliers,
@@ -75,7 +78,8 @@ int findEssentialMatrix_(std::vector<double>& correspondences,
     double conf,
     int min_iters,
     int max_iters,
-    int partition_num);
+    int partition_num,
+    double reference_th); // <= 0: the default (see magsac_python.cpp)
 
     
 int findRigidTransformation_(
@@ -90,4 +94,5 @@ int findRigidTransformation_(
     //double neighborhood_size,
     int min_iters,
     int max_iters,
-    int partition_num);
+    int partition_num,
+    double reference_th); // <= 0: the default (see magsac_python.cpp)
