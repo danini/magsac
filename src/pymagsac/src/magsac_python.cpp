@@ -421,10 +421,9 @@ int findEssentialMatrix_(std::vector<double>& correspondences,
         return 0;
     }
 
-    // Initializing the weights for the bundle adjustment
-	std::vector<double> weights;
+    // Initializing the weights for the bundle adjustment: one per point, as the solvers index them
+	std::vector<double> weights(points.rows, 1.0);
 	std::vector<size_t> inlier_indices;
-    weights.reserve(points.rows);
     inlier_indices.reserve(points.rows);
 
     double residual;
@@ -439,7 +438,6 @@ int findEssentialMatrix_(std::vector<double>& correspondences,
         if (is_inlier)
         {
             inlier_indices.emplace_back(pt_idx);
-            weights.emplace_back(1.0);
         }
     }
 
