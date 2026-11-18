@@ -31,8 +31,6 @@ set(CMAKE_CXX_FLAGS "-fPIC")
 find_package(OpenCV)
 if (OPENCV_FOUND)
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenCV_CXX_FLAGS}")
-  	add_definitions(-DUSE_OPENMP)
-	set(TRGT_LNK_LBS_ADDITIONAL OpenMP::OpenMP_CXX)
 endif (OPENCV_FOUND)
 
 # ==============================================================================
