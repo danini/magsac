@@ -151,7 +151,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 # Test of the weights of the final fit of the original MAGSAC, not built by default:
 #   cmake --build <build> --target test_sigma_consensus_weights && <build>/test_sigma_consensus_weights
 add_executable(test_sigma_consensus_weights EXCLUDE_FROM_ALL tests/cpp/test_sigma_consensus_weights.cpp)
-target_link_libraries(test_sigma_consensus_weights ${PROJECT_NAME} GraphCutRANSAC ${OpenCV_LIBS} Eigen3::Eigen gflags ${TRGT_LNK_LBS_ADDITIONAL})
+target_link_libraries(test_sigma_consensus_weights ${PROJECT_NAME} GraphCutRANSAC ${OpenCV_LIBS} Eigen3::Eigen gflags)
 set_target_properties(test_sigma_consensus_weights PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 # ==============================================================================
