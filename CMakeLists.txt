@@ -146,6 +146,11 @@ target_link_libraries(${PROJECT_NAME}
 
 install(TARGETS pymagsac DESTINATION .)
 
+# Test of MAGSAC++'s IRLS weights, not built by default:
+#   cmake --build <build> --target test_irls_weights && <build>/test_irls_weights
+add_executable(test_irls_weights EXCLUDE_FROM_ALL tests/cpp/test_irls_weights.cpp)
+target_link_libraries(test_irls_weights ${PROJECT_NAME} GraphCutRANSAC ${OpenCV_LIBS} Eigen3::Eigen gflags)
+
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 	
 # ==============================================================================
