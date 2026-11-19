@@ -469,6 +469,7 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensus(
 	// If OpenMP is used, calculate things in parallel
 #ifdef USE_OPENMP
 #pragma omp parallel for num_threads(core_number)
+#endif
 	for (int partition_idx = 0; partition_idx < partition_number; ++partition_idx)
 	{
 		// The maximum sigma value in the current partition
@@ -565,9 +566,6 @@ bool MAGSAC<DatumType, ModelEstimator>::sigmaConsensus(
 			}
 		}
 	}
-#else
-	std::cerr << "Not implemented yet.";
-#endif
 
 	// The weights used for the final weighted least-squares fitting
 	// If point normalization is applied the indexing of the weights differs.
